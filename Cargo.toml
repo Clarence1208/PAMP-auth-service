@@ -5,8 +5,8 @@ edition = "2021"
 
 [dependencies]
 # Using a version that's compatible with utoipa-swagger-ui
-axum = "0.8.3"
-tokio = { version = "1.44.2", features = ["rt", "macros"] }
+axum = { version = "0.8.3", features = ["json", "macros"] }
+tokio = { version = "1.44.2", features = ["rt", "macros", "full"] }
 
 dotenvy = "0.15.7"
 
@@ -14,6 +14,22 @@ oauth-axum = "0.1.4"
 log = "0.4.27"
 
 # OpenAPI documentation
-utoipa = { version = "5.3.1", features = ["axum_extras"] }
+utoipa = { version = "5.3.1", features = ["axum_extras", "uuid", "chrono"] }
 utoipa-swagger-ui = { version = "9.0.1", features = ["axum"] }
 serde = { version = "1.0", features = ["derive"] }
+
+sea-orm = { version = "1.1.8", features = ["runtime-tokio-rustls", "sqlx-postgres", "macros", "with-uuid", "with-chrono", "with-time", "mock"] }
+
+# Authentication and security
+argon2 = "0.5" # Password hashing
+jsonwebtoken = "9.1"
+chrono = { version = "0.4", features = ["serde"] }
+
+# Utils
+uuid = { version = "1.4", features = ["serde", "v4"] }
+thiserror = "2.0.12" # Error handling
+validator = { version = "0.20.0", features = ["derive"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+serde_json = "1.0"
+reqwest = { version = "0.12.15", features = ["json"] }

@@ -1,18 +1,28 @@
-use axum::{routing::get, Extension, Router};
+use axum::{
+    routing::{get, post},
+    Extension, Router,
+};
 use dotenvy::dotenv;
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 mod handlers;
 mod providers;
 mod api_docs;
+mod entities;
+mod db;
+mod auth;
+mod services;
 
-use handlers::google_handler as auth;
+use handlers::google_handler as auth_google;
+use handlers::auth_handler;
 use providers::google_provider::init_google_client;
 use api_docs::ApiDoc;
+use db::{init_db, ensure_schema_exists};
 
 // fixme Simple in-memory storage for OAuth state and verifiers
 #[derive(Clone)]
@@ -29,52 +39,77 @@ impl OAuthState {
 
     pub fn set(&self, state: String, verifier: String) {
         let mut states = self.states.lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
+            .map_err(|_| "Failed to lock mutex")
+            .expect("Failed to lock OAuth state mutex");
         states.insert(state, verifier);
     }
 
     pub fn get(&self, state: String) -> Option<String> {
         let states = self.states
-            .lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+            .lock()
+            .map_err(|_| "Failed to lock mutex")
+            .expect("Failed to lock OAuth state mutex");
         states.get(&state).cloned()
     }
 }
 
 #[tokio::main(flavor = "current_thread")]
-async fn main() {
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    tracing_subscriber::registry()
+        .with(tracing_subscriber::EnvFilter::new(
+            std::env::var("RUST_LOG").unwrap_or_else(|_| "info".into()),
+        ))
+        .with(tracing_subscriber::fmt::layer())
+        .init();
+
     dotenv().ok();
+
+    let db = init_db().await?;
+    
+    ensure_schema_exists(&db).await?;
+    tracing::info!("Database schema initialized");
 
     let google_client = Arc::new(init_google_client());
     let oauth_state = OAuthState::new();
 
     let openapi = ApiDoc::openapi();
 
+    let api_routes = Router::new()
+        .route("/auth/register/teacher", post(auth_handler::register_teacher));
+
+    let auth_routes = Router::new()
+        .route("/auth/google", get(auth_google::google_login))
+        .route("/auth/callback/google", get(auth_google::google_callback));
+
     let app = Router::new()
         .route("/", get(|| async { "Hello from Auth Service!" }))
-        .route("/auth/google", get(auth::google_login))
-        .route("/auth/callback/google", get(auth::google_callback))
+        .merge(auth_routes)
+        .merge(api_routes)
         .merge(
             SwaggerUi::new("/swagger-ui")
                 .url("/api-docs/openapi.json", openapi)
         )
         .layer(Extension(google_client))
-        .layer(Extension(oauth_state));
+        .layer(Extension(oauth_state))
+        .layer(Extension(Arc::new(db)));
 
-    start_server(app).await;
+    start_server(app).await?;
+    
+    Ok(())
 }
 
-async fn start_server(app: Router) {
+async fn start_server(app: Router) -> Result<(), Box<dyn std::error::Error>> {
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
-    println!("Serveur lancé sur {}", addr);
+    tracing::info!("Server started on {}", addr);
 
     match tokio::net::TcpListener::bind(&addr).await {
         Ok(listener) => {
-            if let Err(e) = axum::serve(listener, app.into_make_service()).await {
-                eprintln!("Server error: {}", e);
-            }
+            axum::serve(listener, app.into_make_service()).await?;
+            Ok(())
         }
         Err(e) => {
-            eprintln!("Failed to bind to address: {}", e);
+            tracing::error!("Failed to bind to address: {}", e);
+            Err(e.into())
         }
     }
 }

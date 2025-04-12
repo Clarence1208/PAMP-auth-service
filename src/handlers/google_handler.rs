@@ -8,8 +8,13 @@ use axum::{
 use oauth_axum::{OAuthClient, CustomProvider};
 use std::collections::HashMap;
 use std::sync::Arc;
+use serde_json::Value;
+use sea_orm::DatabaseConnection;
 use crate::OAuthState;
 use crate::api_docs::{AuthResponse, ErrorResponse};
+use crate::entities::user::{UserRole};
+use crate::services::user_service;
+use crate::auth::jwt;
 
 #[utoipa::path(
     get,
@@ -20,6 +25,7 @@ use crate::api_docs::{AuthResponse, ErrorResponse};
         (status = 500, description = "Internal server error", body = ErrorResponse)
     )
 )]
+#[axum::debug_handler]
 pub async fn google_login(
     Extension(client): Extension<Arc<CustomProvider>>,
     Extension(state_store): Extension<OAuthState>,
@@ -65,13 +71,16 @@ pub async fn google_login(
     ),
     responses(
         (status = 200, description = "Login successful", body = AuthResponse),
+        (status = 401, description = "User not registered", body = ErrorResponse),
         (status = 400, description = "Bad request", body = ErrorResponse),
         (status = 500, description = "Internal server error", body = ErrorResponse)
     )
 )]
+#[axum::debug_handler]
 pub async fn google_callback(
     Extension(client): Extension<Arc<CustomProvider>>,
     Extension(state_store): Extension<OAuthState>,
+    Extension(db): Extension<Arc<DatabaseConnection>>,
     Query(params): Query<HashMap<String, String>>,
 ) -> Response {
     let code = match params.get("code") {
@@ -99,19 +108,130 @@ pub async fn google_callback(
         ).into_response(),
     };
     
-    // Generate the token
-    match (*client).clone().generate_token(code, verifier).await {
-        Ok(token) => {
-            (
-                StatusCode::OK, 
-                Json(AuthResponse { token })
-            ).into_response()
-        },
+    // Generate the OAuth token from Google
+    let oauth_token = match (*client).clone().generate_token(code, verifier).await {
+        Ok(token) => token,
         Err(e) => {
-            (
+            return (
                 StatusCode::BAD_REQUEST, 
-                Json(ErrorResponse { message: format!("Erreur échange de token: {:?}", e.type_id()) })
+                Json(ErrorResponse { message: format!("Error exchanging token: {:?}", e.type_id()) })
             ).into_response()
         }
-    }
+    };
+    
+    // Fetch user info from Google
+    let user_info_url = "https://www.googleapis.com/oauth2/v2/userinfo";
+    let client = reqwest::Client::new();
+    let user_info_response = match client
+        .get(user_info_url)
+        .bearer_auth(&oauth_token)
+        .send()
+        .await {
+            Ok(response) => response,
+            Err(e) => {
+                tracing::error!("Failed to fetch user info: {:?}", e);
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(ErrorResponse { message: "Failed to fetch user info".to_string() })
+                ).into_response();
+            }
+        };
+    
+    let user_info: Value = match user_info_response.json().await {
+        Ok(info) => info,
+        Err(e) => {
+            tracing::error!("Failed to parse user info: {:?}", e);
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ErrorResponse { message: "Failed to parse user info".to_string() })
+            ).into_response();
+        }
+    };
+    
+    // Extract user details
+    let email = match user_info.get("email").and_then(|e| e.as_str()) {
+        Some(email) => email,
+        None => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(ErrorResponse { message: "Email not found in Google profile".to_string() })
+            ).into_response();
+        }
+    };
+    
+    let google_id = match user_info.get("id").and_then(|id| id.as_str()) {
+        Some(id) => id,
+        None => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(ErrorResponse { message: "ID not found in Google profile".to_string() })
+            ).into_response();
+        }
+    };
+    
+    // Get name from profile, use defaults if not found
+    let _first_name = user_info.get("given_name")
+        .and_then(|n| n.as_str())
+        .unwrap_or("Google")
+        .to_string();
+    
+    let _last_name = user_info.get("family_name")
+        .and_then(|n| n.as_str())
+        .unwrap_or("User")
+        .to_string();
+    
+    // Check if user exists in our database
+    let user = match user_service::find_by_email(db.as_ref(), email).await {
+        Ok(Some(user)) => user,
+        Ok(None) => {
+            // Check if user exists by Google ID
+            match user_service::find_by_external_auth(db.as_ref(), "google", google_id).await {
+                Ok(Some(user)) => user,
+                Ok(None) => {
+                    // User not registered
+                    return (
+                        StatusCode::UNAUTHORIZED,
+                        Json(ErrorResponse { 
+                            message: "User not registered. Please register before logging in.".to_string() 
+                        })
+                    ).into_response();
+                },
+                Err(e) => {
+                    tracing::error!("Database error checking external auth: {:?}", e);
+                    return (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        Json(ErrorResponse { message: "Database error".to_string() })
+                    ).into_response();
+                }
+            }
+        },
+        Err(e) => {
+            tracing::error!("Database error checking email: {:?}", e);
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ErrorResponse { message: "Database error".to_string() })
+            ).into_response();
+        }
+    };
+    
+    // Get user role
+    let role = UserRole::from(user.role.clone());
+    
+    // Generate our own JWT token for the user
+    let jwt_token = match jwt::create_token(user.user_id, &user.email, &role) {
+        Ok(token) => token,
+        Err(e) => {
+            tracing::error!("Failed to generate JWT token: {:?}", e);
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ErrorResponse { message: "Failed to generate JWT token".to_string() })
+            ).into_response();
+        }
+    };
+    
+    // Return the JWT token
+    (
+        StatusCode::OK, 
+        Json(AuthResponse { token: jwt_token })
+    ).into_response()
 }

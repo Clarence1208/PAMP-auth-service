@@ -28,9 +28,17 @@ pub struct CallbackParams {
     paths(
         crate::handlers::google_handler::google_login,
         crate::handlers::google_handler::google_callback,
+        crate::handlers::auth_handler::register_teacher,
     ),
     components(
-        schemas(AuthResponse, ErrorResponse, CallbackParams)
+        schemas(
+            AuthResponse, 
+            ErrorResponse, 
+            CallbackParams,
+            crate::entities::user::RegisterTeacherRequest,
+            crate::entities::user::UserRole,
+            crate::entities::user::Model
+        )
     ),
     tags(
         (name = "authentication", description = "Authentication endpoints")
