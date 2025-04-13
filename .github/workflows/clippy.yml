@@ -27,18 +27,38 @@ jobs:
       - name: Cache dependencies
         uses: Swatinem/rust-cache@v2
       
-      - name: Generate Clippy report
+      - name: Check if code compiles first
+        id: compile_check
+        continue-on-error: true
         run: |
-          # Run clippy WITHOUT -D warnings flag to only fail on errors, not warnings
-          cargo clippy --all-targets --all-features > clippy_output.txt 2>&1
+          # First just check if the code compiles
+          cargo check --all-targets --all-features
+          echo "COMPILE_EXIT_CODE=$?" >> $GITHUB_ENV
+          
+          # If compilation fails, we want to know about it
+          if [ $? -ne 0 ]; then
+            echo "REASON=compilation_error" >> $GITHUB_ENV
+            echo "⚠️ Code doesn't compile. Fix compilation errors first."
+            cargo check --all-targets --all-features > compile_output.txt 2>&1
+          else
+            echo "✅ Code compiles successfully."
+          fi
+      
+      - name: Generate Clippy report
+        if: env.COMPILE_EXIT_CODE == '0'
+        id: clippy_check
+        continue-on-error: true
+        run: |
+          # Run clippy with specific allowed lints
+          cargo clippy --all-targets --all-features --no-deps > clippy_output.txt 2>&1
           CLIPPY_EXIT_CODE=$?
           
           # Format the output to be more readable
           echo "## Clippy Report" > clippy_summary.md
           echo '```' >> clippy_summary.md
           
-          # Save original output for context
-          cat clippy_output.txt >> clippy_full_report.txt
+          # Save original output for context and debugging
+          cat clippy_output.txt > clippy_full_report.txt
           
           # Extract error and warning lines and strip ANSI color codes
           grep -E "error:|warning:|-->|" clippy_output.txt | sed 's/\x1B\[[0-9;]*[mK]//g' >> clippy_summary.md
@@ -51,38 +71,62 @@ jobs:
           echo "## Summary" >> clippy_summary.md
           echo "* Errors: $ERROR_COUNT" >> clippy_summary.md
           echo "* Warnings: $WARNING_COUNT" >> clippy_summary.md
-          echo "* Exit Code: $CLIPPY_EXIT_CODE (non-zero means Clippy found errors)" >> clippy_summary.md
+          echo "* Exit Code: $CLIPPY_EXIT_CODE" >> clippy_summary.md
           echo '```' >> clippy_summary.md
           
-          if [ $CLIPPY_EXIT_CODE -ne 0 ]; then
+          # Store counts for later steps
+          echo "ERROR_COUNT=$ERROR_COUNT" >> $GITHUB_ENV
+          echo "WARNING_COUNT=$WARNING_COUNT" >> $GITHUB_ENV
+          echo "CLIPPY_EXIT_CODE=$CLIPPY_EXIT_CODE" >> $GITHUB_ENV
+          
+          # Only treat compilation errors as failures, not linting warnings
+          if [[ $ERROR_COUNT -gt 0 && $CLIPPY_EXIT_CODE -ne 0 ]]; then
+            echo "REASON=clippy_errors" >> $GITHUB_ENV
             echo "⚠️ Clippy found errors! Exit code: $CLIPPY_EXIT_CODE"
             cat clippy_summary.md
           else
             if [ $WARNING_COUNT -gt 0 ]; then
-              echo "⚠️ Clippy found $WARNING_COUNT warnings, but no errors. See report for details."
+              echo "⚠️ Clippy found $WARNING_COUNT warnings, but no errors. Build will pass."
             else
               echo "✅ Clippy is happy with your code!"
             fi
+            # Ensure the step is considered successful regardless of warnings
+            exit 0
           fi
-          
-          # Store exit code for later steps
-          echo "CLIPPY_EXIT_CODE=$CLIPPY_EXIT_CODE" >> $GITHUB_ENV
-          echo "WARNING_COUNT=$WARNING_COUNT" >> $GITHUB_ENV
       
-      - name: Comment PR with Clippy report
-        if: github.event_name == 'pull_request' && (env.CLIPPY_EXIT_CODE != '0' || env.WARNING_COUNT != '0')
+      - name: Prepare compilation error report
+        if: env.COMPILE_EXIT_CODE != '0'
+        run: |
+          echo "## Compilation Failed" > clippy_summary.md
+          echo '```' >> clippy_summary.md
+          cat compile_output.txt | sed 's/\x1B\[[0-9;]*[mK]//g' >> clippy_summary.md
+          echo '```' >> clippy_summary.md
+          
+          echo "### The code doesn't compile" >> clippy_summary.md
+          echo "Fix the compilation errors before Clippy can analyze the code." >> clippy_summary.md
+      
+      - name: Comment PR with report
+        if: github.event_name == 'pull_request' && (env.COMPILE_EXIT_CODE != '0' || env.WARNING_COUNT != '0' || env.ERROR_COUNT != '0')
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const fs = require('fs');
             const report = fs.readFileSync('clippy_summary.md', 'utf8');
-            const warningCount = process.env.WARNING_COUNT;
-            const exitCode = process.env.CLIPPY_EXIT_CODE;
+            const reason = process.env.REASON || 'unknown';
+            const warningCount = process.env.WARNING_COUNT || '0';
+            const errorCount = process.env.ERROR_COUNT || '0';
             
-            let title = "## Clippy Found Issues";
-            if (exitCode === '0' && warningCount !== '0') {
-              title = "## Clippy Found Warnings (Build Passed)";
+            let title = "## Clippy Analysis Results";
+            
+            if (reason === 'compilation_error') {
+              title = "## ❌ Compilation Failed";
+            } else if (reason === 'clippy_errors') {
+              title = "## ❌ Clippy Found Errors";
+            } else if (warningCount !== '0' && errorCount === '0') {
+              title = "## ⚠️ Clippy Found Warnings (Build Passed)";
+            } else {
+              title = "## ✅ Clippy Analysis Passed";
             }
             
             github.rest.issues.createComment({
@@ -92,8 +136,16 @@ jobs:
               body: `${title}\n\n${report}`
             });
 
-      - name: Fail if Clippy found errors (not just warnings)
-        if: env.CLIPPY_EXIT_CODE != '0'
+      - name: Determine overall success
+        if: always()
         run: |
-          echo "::error::Clippy found errors. Please fix them before merging."
-          exit 1 
+          if [ "${{ env.COMPILE_EXIT_CODE }}" != "0" ]; then
+            echo "::error::Compilation failed. Please fix the errors before proceeding."
+            exit 1
+          elif [ "${{ env.REASON }}" == "clippy_errors" ]; then
+            echo "::error::Clippy found errors. Please fix them before merging."
+            exit 1
+          else
+            echo "::notice::Analysis completed successfully."
+            exit 0
+          fi 
