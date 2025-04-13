@@ -20,7 +20,10 @@ This directory contains GitHub Actions workflows for continuous integration and 
 - Generates a report and comments on PRs with the results
 - Formatted to show only relevant error information without dependency noise
 - Runs on all PRs and pushes to master
-- **Treats warnings as warnings** (not errors) - the build will pass even with warnings
+- **Distinguishes between different types of issues**:
+  - Compilation errors (fails the build)
+  - Clippy errors (fails the build)
+  - Clippy warnings (build passes)
 
 ### 4. Docker Build (`build.yml`)
 - Builds and publishes the Docker image to GitHub Container Registry
@@ -36,30 +39,31 @@ This directory contains GitHub Actions workflows for continuous integration and 
 
 ### Clippy Issues
 
-If Clippy reports issues in your PR:
+The Clippy workflow distinguishes between three types of issues:
 
-1. **Errors vs Warnings**: 
-   - **Errors**: Will cause the build to fail and must be fixed
-   - **Warnings**: Will not cause the build to fail, but should be addressed when convenient
+1. **Compilation Errors**: 
+   - These are syntax errors, type errors, etc. that prevent the code from compiling
+   - These will cause the build to fail
+   - Example: Using an undefined variable, mismatched types
 
-2. **Common Warnings**:
-   - Unused imports
-   - Unused variables
-   - Dead code (unused functions)
-   - Redundant patterns
+2. **Clippy Errors**:
+   - These are serious issues found by Clippy that will cause the build to fail
+   - Usually related to correctness or safety concerns
+   - Example: Dereferencing raw pointers, incorrect mutex usage
 
-3. **Trait Implementation Issues**: Issues like implementing `ToString` directly:
-   ```rust
-   // Instead of this:
-   impl ToString for MyType { ... }
-   
-   // Prefer this:
-   impl std::fmt::Display for MyType {
-       fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-           write!(f, "{}", self.to_string_impl())
-       }
-   }
-   ```
+3. **Clippy Warnings**:
+   - These are style issues, potential inefficiencies, or code smells
+   - These will NOT cause the build to fail
+   - Example: Unused imports, unused variables, redundant patterns
+
+### Common Clippy Warnings (Build Will Pass)
+
+- Unused imports
+- Unused variables
+- Dead code (unused functions)
+- Redundant patterns
+- Non-snake case variable names
+- Implementing `ToString` directly instead of `Display`
 
 ### Format Issues
 
@@ -67,13 +71,23 @@ If format check fails, run `cargo fmt` locally before committing your changes.
 
 ## Troubleshooting CI Failures
 
-### Clippy Results
+### Clippy Workflow States
 
-The Clippy workflow now has different states:
+The Clippy workflow now has different states with clear icons in PR comments:
 
-1. **Success without warnings**: No issues found
-2. **Success with warnings**: Some warnings found, but the build passes
-3. **Failure**: Actual errors found that must be fixed
+1. **✅ Clippy Analysis Passed**: No issues found
+2. **⚠️ Clippy Found Warnings (Build Passed)**: Some warnings found, but the build passes
+3. **❌ Clippy Found Errors**: Clippy found serious issues that must be fixed (build fails)
+4. **❌ Compilation Failed**: The code doesn't compile at all (build fails)
+
+### Fixing Code That Doesn't Compile
+
+If you see a "Compilation Failed" message:
+
+1. Look at the error messages in the PR comment
+2. Fix the syntax errors, type errors, or other compilation issues
+3. Push the changes to your branch
+4. The workflow will run again
 
 ### Differences Between Local and CI Clippy Results
 
@@ -85,11 +99,9 @@ Local and CI Clippy runs might show different results because:
 To replicate CI environment locally, run:
 
 ```bash
+# First check if the code compiles
+cargo check --all-targets --all-features
+
+# Then run Clippy
 cargo clippy --all-targets --all-features
-```
-
-To check if warnings would be treated as errors locally (stricter than the CI):
-
-```bash
-cargo clippy --all-targets --all-features -- -D warnings
 ``` 

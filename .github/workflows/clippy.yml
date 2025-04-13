@@ -32,20 +32,21 @@ jobs:
         continue-on-error: true
         run: |
           # First just check if the code compiles
-          cargo check --all-targets --all-features
-          echo "COMPILE_EXIT_CODE=$?" >> $GITHUB_ENV
+          cargo check --all-targets --all-features > compile_output.txt 2>&1
+          COMPILE_EXIT_CODE=$?
           
-          # If compilation fails, we want to know about it
-          if [ $? -ne 0 ]; then
-            echo "REASON=compilation_error" >> $GITHUB_ENV
+          # Use GitHub's newer output method
+          echo "compile_exit_code=$COMPILE_EXIT_CODE" >> $GITHUB_OUTPUT
+          
+          if [ $COMPILE_EXIT_CODE -ne 0 ]; then
+            echo "reason=compilation_error" >> $GITHUB_OUTPUT
             echo "⚠️ Code doesn't compile. Fix compilation errors first."
-            cargo check --all-targets --all-features > compile_output.txt 2>&1
           else
             echo "✅ Code compiles successfully."
           fi
       
       - name: Generate Clippy report
-        if: env.COMPILE_EXIT_CODE == '0'
+        if: steps.compile_check.outputs.compile_exit_code == '0'
         id: clippy_check
         continue-on-error: true
         run: |
@@ -61,7 +62,7 @@ jobs:
           cat clippy_output.txt > clippy_full_report.txt
           
           # Extract error and warning lines and strip ANSI color codes
-          grep -E "error:|warning:|-->|" clippy_output.txt | sed 's/\x1B\[[0-9;]*[mK]//g' >> clippy_summary.md
+          grep -E "error:|warning:|-->|" clippy_output.txt | sed 's/\x1B\[[0-9;]*[mK]//g' >> clippy_summary.md || true
           
           # Count actual errors and warnings
           ERROR_COUNT=$(grep -c "error:" clippy_output.txt || echo 0)
@@ -74,14 +75,14 @@ jobs:
           echo "* Exit Code: $CLIPPY_EXIT_CODE" >> clippy_summary.md
           echo '```' >> clippy_summary.md
           
-          # Store counts for later steps
-          echo "ERROR_COUNT=$ERROR_COUNT" >> $GITHUB_ENV
-          echo "WARNING_COUNT=$WARNING_COUNT" >> $GITHUB_ENV
-          echo "CLIPPY_EXIT_CODE=$CLIPPY_EXIT_CODE" >> $GITHUB_ENV
+          # Use GitHub's newer output method
+          echo "error_count=$ERROR_COUNT" >> $GITHUB_OUTPUT
+          echo "warning_count=$WARNING_COUNT" >> $GITHUB_OUTPUT
+          echo "clippy_exit_code=$CLIPPY_EXIT_CODE" >> $GITHUB_OUTPUT
           
           # Only treat compilation errors as failures, not linting warnings
           if [[ $ERROR_COUNT -gt 0 && $CLIPPY_EXIT_CODE -ne 0 ]]; then
-            echo "REASON=clippy_errors" >> $GITHUB_ENV
+            echo "reason=clippy_errors" >> $GITHUB_OUTPUT
             echo "⚠️ Clippy found errors! Exit code: $CLIPPY_EXIT_CODE"
             cat clippy_summary.md
           else
@@ -90,12 +91,10 @@ jobs:
             else
               echo "✅ Clippy is happy with your code!"
             fi
-            # Ensure the step is considered successful regardless of warnings
-            exit 0
           fi
       
       - name: Prepare compilation error report
-        if: env.COMPILE_EXIT_CODE != '0'
+        if: steps.compile_check.outputs.compile_exit_code != '0'
         run: |
           echo "## Compilation Failed" > clippy_summary.md
           echo '```' >> clippy_summary.md
@@ -106,16 +105,28 @@ jobs:
           echo "Fix the compilation errors before Clippy can analyze the code." >> clippy_summary.md
       
       - name: Comment PR with report
-        if: github.event_name == 'pull_request' && (env.COMPILE_EXIT_CODE != '0' || env.WARNING_COUNT != '0' || env.ERROR_COUNT != '0')
+        if: |
+          github.event_name == 'pull_request' && (
+            steps.compile_check.outputs.compile_exit_code != '0' || 
+            steps.clippy_check.outputs.warning_count != '0' || 
+            steps.clippy_check.outputs.error_count != '0'
+          )
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const fs = require('fs');
             const report = fs.readFileSync('clippy_summary.md', 'utf8');
-            const reason = process.env.REASON || 'unknown';
-            const warningCount = process.env.WARNING_COUNT || '0';
-            const errorCount = process.env.ERROR_COUNT || '0';
+            
+            let reason = 'unknown';
+            if ('${{ steps.compile_check.outputs.reason }}' !== '') {
+              reason = '${{ steps.compile_check.outputs.reason }}';
+            } else if ('${{ steps.clippy_check.outputs.reason }}' !== '') {
+              reason = '${{ steps.clippy_check.outputs.reason }}';
+            }
+            
+            const warningCount = '${{ steps.clippy_check.outputs.warning_count }}' || '0';
+            const errorCount = '${{ steps.clippy_check.outputs.error_count }}' || '0';
             
             let title = "## Clippy Analysis Results";
             
@@ -139,10 +150,17 @@ jobs:
       - name: Determine overall success
         if: always()
         run: |
-          if [ "${{ env.COMPILE_EXIT_CODE }}" != "0" ]; then
+          # Check compilation status
+          COMPILE_EXIT_CODE="${{ steps.compile_check.outputs.compile_exit_code }}"
+          CLIPPY_REASON="${{ steps.clippy_check.outputs.reason }}"
+          
+          echo "Compile exit code: $COMPILE_EXIT_CODE"
+          echo "Clippy reason: $CLIPPY_REASON"
+          
+          if [[ "$COMPILE_EXIT_CODE" != "0" && "$COMPILE_EXIT_CODE" != "" ]]; then
             echo "::error::Compilation failed. Please fix the errors before proceeding."
             exit 1
-          elif [ "${{ env.REASON }}" == "clippy_errors" ]; then
+          elif [[ "$CLIPPY_REASON" == "clippy_errors" ]]; then
             echo "::error::Clippy found errors. Please fix them before merging."
             exit 1
           else
