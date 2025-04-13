@@ -69,9 +69,13 @@ jobs:
           # Extract error and warning lines and strip ANSI color codes
           grep -E "error:|warning:|-->|" clippy_output.txt | sed 's/\x1B\[[0-9;]*[mK]//g' >> clippy_summary.md || true
           
-          # Count actual errors and warnings (ensure numeric)
-          ERROR_COUNT=$(grep -c "error:" clippy_output.txt || echo 0)
-          WARNING_COUNT=$(grep -c "warning:" clippy_output.txt || echo 0)
+          # Count actual errors and warnings - force to integer
+          ERROR_COUNT=$(grep -c "error:" clippy_output.txt 2>/dev/null || echo 0)
+          WARNING_COUNT=$(grep -c "warning:" clippy_output.txt 2>/dev/null || echo 0)
+          
+          # Ensure these are treated as numbers
+          ERROR_COUNT=${ERROR_COUNT:-0}
+          WARNING_COUNT=${WARNING_COUNT:-0}
           
           echo "" >> clippy_summary.md
           echo "## Summary" >> clippy_summary.md
@@ -85,29 +89,26 @@ jobs:
           echo "warning_count=$WARNING_COUNT" >> $GITHUB_OUTPUT
           echo "clippy_exit_code=$CLIPPY_EXIT_CODE" >> $GITHUB_OUTPUT
           
-          # For boolean flags
-          HAS_ERRORS=false
-          HAS_WARNINGS=false
-          
-          # Explicitly check numeric values
-          if [ "$ERROR_COUNT" -gt 0 ]; then
-            HAS_ERRORS=true
+          # Simple true/false strings for status flags
+          if [ "$ERROR_COUNT" = "0" ]; then
+            echo "has_errors=false" >> $GITHUB_OUTPUT
+          else
+            echo "has_errors=true" >> $GITHUB_OUTPUT
           fi
           
-          if [ "$WARNING_COUNT" -gt 0 ]; then
-            HAS_WARNINGS=true
+          if [ "$WARNING_COUNT" = "0" ]; then
+            echo "has_warnings=false" >> $GITHUB_OUTPUT
+          else
+            echo "has_warnings=true" >> $GITHUB_OUTPUT
           fi
-          
-          echo "has_errors=$HAS_ERRORS" >> $GITHUB_OUTPUT
-          echo "has_warnings=$HAS_WARNINGS" >> $GITHUB_OUTPUT
           
           # Only treat compilation errors as failures, not linting warnings
-          if [ "$HAS_ERRORS" = "true" ] && [ "$CLIPPY_EXIT_CODE" -ne 0 ]; then
+          if [ "$ERROR_COUNT" != "0" ] && [ "$CLIPPY_EXIT_CODE" != "0" ]; then
             echo "reason=clippy_errors" >> $GITHUB_OUTPUT
             echo "⚠️ Clippy found errors! Exit code: $CLIPPY_EXIT_CODE"
             cat clippy_summary.md
           else
-            if [ "$HAS_WARNINGS" = "true" ]; then
+            if [ "$WARNING_COUNT" != "0" ]; then
               echo "⚠️ Clippy found $WARNING_COUNT warnings, but no errors. Build will pass."
             else
               echo "✅ Clippy is happy with your code!"
@@ -178,14 +179,12 @@ jobs:
           COMPILE_EXIT_CODE="${{ steps.compile_check.outputs.compile_exit_code }}"
           CLIPPY_REASON="${{ steps.clippy_check.outputs.reason }}"
           HAS_ERRORS="${{ steps.clippy_check.outputs.has_errors }}"
-          CLIPPY_EXIT_CODE="${{ steps.clippy_check.outputs.clippy_exit_code }}"
           
           echo "Compile exit code: $COMPILE_EXIT_CODE"
           echo "Clippy reason: $CLIPPY_REASON"
           echo "Has errors: $HAS_ERRORS"
-          echo "Clippy exit code: $CLIPPY_EXIT_CODE"
           
-          if [ -n "$COMPILE_EXIT_CODE" ] && [ "$COMPILE_EXIT_CODE" -ne 0 ]; then
+          if [ "$COMPILE_EXIT_CODE" = "1" ]; then
             echo "::error::Compilation failed. Please fix the errors before proceeding."
             exit 1
           elif [ "$CLIPPY_REASON" = "clippy_errors" ] || [ "$HAS_ERRORS" = "true" ]; then
