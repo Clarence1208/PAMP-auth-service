@@ -59,14 +59,12 @@ pub async fn auth_middleware(request: Request, next: Next) -> Response {
             // Future enhancement: Store claims in request extensions for access in handlers
             next.run(request).await
         }
-        Err(_) => {
-            (
-                StatusCode::UNAUTHORIZED,
-                Json(ErrorResponse {
-                    message: "Invalid or expired token".to_string(),
-                }),
-            )
-                .into_response()
-        }
+        Err(_) => (
+            StatusCode::UNAUTHORIZED,
+            Json(ErrorResponse {
+                message: "Invalid or expired token".to_string(),
+            }),
+        )
+            .into_response(),
     }
-} 
+}

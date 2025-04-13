@@ -1,1 +1,1 @@
-pub mod google_provider; 
+pub mod google_provider;

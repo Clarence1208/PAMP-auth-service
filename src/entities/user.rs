@@ -1,5 +1,5 @@
-use sea_orm::entity::prelude::*;
 use chrono::{DateTime, Utc};
+use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use validator::Validate;
@@ -68,4 +68,4 @@ pub struct RegisterTeacherRequest {
     pub first_name: String,
     #[validate(length(min = 1, message = "Last name is required"))]
     pub last_name: String,
-} 
+}
