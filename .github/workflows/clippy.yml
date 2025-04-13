@@ -105,11 +105,11 @@ jobs:
           # Only treat compilation errors as failures, not linting warnings
           if [ "$ERROR_COUNT" != "0" ] && [ "$CLIPPY_EXIT_CODE" != "0" ]; then
             echo "reason=clippy_errors" >> $GITHUB_OUTPUT
-            echo "⚠️ Clippy found errors! Exit code: $CLIPPY_EXIT_CODE"
+            printf "⚠️ Clippy found errors! Exit code: %s\n" "$CLIPPY_EXIT_CODE"
             cat clippy_summary.md
           else
             if [ "$WARNING_COUNT" != "0" ]; then
-              echo "⚠️ Clippy found ${WARNING_COUNT} warnings, but no errors. Build will pass."
+              printf "⚠️ Found %s warnings, but no errors. Build will pass.\n" "$WARNING_COUNT"
             else
               echo "✅ Clippy is happy with your code!"
             fi
