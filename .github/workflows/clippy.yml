@@ -48,11 +48,16 @@ jobs:
       - name: Generate Clippy report
         if: steps.compile_check.outputs.compile_exit_code == '0'
         id: clippy_check
-        continue-on-error: true
         run: |
+          # Turn off automatic exit on error
+          set +e
+          
           # Run clippy with specific allowed lints
           cargo clippy --all-targets --all-features --no-deps > clippy_output.txt 2>&1
           CLIPPY_EXIT_CODE=$?
+          
+          # Turn automatic exit on error back on
+          set -e
           
           # Format the output to be more readable
           echo "## Clippy Report" > clippy_summary.md
@@ -92,6 +97,9 @@ jobs:
               echo "✅ Clippy is happy with your code!"
             fi
           fi
+          
+          # Make sure we let the workflow continue to comment on PR and report
+          exit 0
       
       - name: Prepare compilation error report
         if: steps.compile_check.outputs.compile_exit_code != '0'
@@ -127,12 +135,13 @@ jobs:
             
             const warningCount = '${{ steps.clippy_check.outputs.warning_count }}' || '0';
             const errorCount = '${{ steps.clippy_check.outputs.error_count }}' || '0';
+            const clippy_exit_code = '${{ steps.clippy_check.outputs.clippy_exit_code }}' || '0';
             
             let title = "## Clippy Analysis Results";
             
             if (reason === 'compilation_error') {
               title = "## ❌ Compilation Failed";
-            } else if (reason === 'clippy_errors') {
+            } else if (reason === 'clippy_errors' || (errorCount !== '0' && clippy_exit_code !== '0')) {
               title = "## ❌ Clippy Found Errors";
             } else if (warningCount !== '0' && errorCount === '0') {
               title = "## ⚠️ Clippy Found Warnings (Build Passed)";
@@ -153,14 +162,18 @@ jobs:
           # Check compilation status
           COMPILE_EXIT_CODE="${{ steps.compile_check.outputs.compile_exit_code }}"
           CLIPPY_REASON="${{ steps.clippy_check.outputs.reason }}"
+          ERROR_COUNT="${{ steps.clippy_check.outputs.error_count }}"
+          CLIPPY_EXIT_CODE="${{ steps.clippy_check.outputs.clippy_exit_code }}"
           
           echo "Compile exit code: $COMPILE_EXIT_CODE"
           echo "Clippy reason: $CLIPPY_REASON"
+          echo "Error count: $ERROR_COUNT"
+          echo "Clippy exit code: $CLIPPY_EXIT_CODE"
           
           if [[ "$COMPILE_EXIT_CODE" != "0" && "$COMPILE_EXIT_CODE" != "" ]]; then
             echo "::error::Compilation failed. Please fix the errors before proceeding."
             exit 1
-          elif [[ "$CLIPPY_REASON" == "clippy_errors" ]]; then
+          elif [[ "$CLIPPY_REASON" == "clippy_errors" || ( "$ERROR_COUNT" != "0" && "$ERROR_COUNT" != "" && "$CLIPPY_EXIT_CODE" != "0" ) ]]; then
             echo "::error::Clippy found errors. Please fix them before merging."
             exit 1
           else
