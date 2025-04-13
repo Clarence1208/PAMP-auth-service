@@ -65,7 +65,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     dotenv().ok();
 
     let db = init_db().await?;
-    
+
+    //fixme make clippy fails for test
+    dledqd^;
+
+
     ensure_schema_exists(&db).await?;
     tracing::info!("Database schema initialized");
 
