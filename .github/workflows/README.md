@@ -8,6 +8,7 @@ This directory contains GitHub Actions workflows for continuous integration and 
 - Checks that all Rust code follows standard formatting rules using `rustfmt`
 - Runs on all PRs and pushes to master
 - Will fail if any code doesn't match the standard Rust format
+- Posts formatting errors as PR comments
 
 ### 2. Tests (`test.yml`)
 - Runs all tests with a PostgreSQL database
@@ -19,6 +20,7 @@ This directory contains GitHub Actions workflows for continuous integration and 
 - Generates a report and comments on PRs with the results
 - Formatted to show only relevant error information without dependency noise
 - Runs on all PRs and pushes to master
+- **Treats warnings as warnings** (not errors) - the build will pass even with warnings
 
 ### 4. Docker Build (`build.yml`)
 - Builds and publishes the Docker image to GitHub Container Registry
@@ -36,11 +38,17 @@ This directory contains GitHub Actions workflows for continuous integration and 
 
 If Clippy reports issues in your PR:
 
-1. **Dead Code**: Functions that are never used. Either:
-   - Remove the unused function
-   - Add `#[allow(dead_code)]` attribute to functions that are intended for future use
+1. **Errors vs Warnings**: 
+   - **Errors**: Will cause the build to fail and must be fixed
+   - **Warnings**: Will not cause the build to fail, but should be addressed when convenient
 
-2. **Trait Implementation Issues**: Issues like implementing `ToString` directly:
+2. **Common Warnings**:
+   - Unused imports
+   - Unused variables
+   - Dead code (unused functions)
+   - Redundant patterns
+
+3. **Trait Implementation Issues**: Issues like implementing `ToString` directly:
    ```rust
    // Instead of this:
    impl ToString for MyType { ... }
@@ -55,4 +63,33 @@ If Clippy reports issues in your PR:
 
 ### Format Issues
 
-If format check fails, run `cargo fmt` locally before committing your changes. 
+If format check fails, run `cargo fmt` locally before committing your changes.
+
+## Troubleshooting CI Failures
+
+### Clippy Results
+
+The Clippy workflow now has different states:
+
+1. **Success without warnings**: No issues found
+2. **Success with warnings**: Some warnings found, but the build passes
+3. **Failure**: Actual errors found that must be fixed
+
+### Differences Between Local and CI Clippy Results
+
+Local and CI Clippy runs might show different results because:
+
+1. Different Rust/Clippy versions - ensure your local toolchain matches CI
+2. Different feature flags - make sure you're running Clippy with the same features locally
+
+To replicate CI environment locally, run:
+
+```bash
+cargo clippy --all-targets --all-features
+```
+
+To check if warnings would be treated as errors locally (stricter than the CI):
+
+```bash
+cargo clippy --all-targets --all-features -- -D warnings
+``` 

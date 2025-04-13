@@ -26,8 +26,38 @@ jobs:
 
       - name: Check formatting
         run: |
-          cargo fmt --all -- --check
-          if [ $? -ne 0 ]; then
+          # Run the format check and capture the output
+          cargo fmt --all -- --check > format_output.txt 2>&1
+          FORMAT_EXIT_CODE=$?
+          
+          # Store the exit code for later steps
+          echo "FORMAT_EXIT_CODE=$FORMAT_EXIT_CODE" >> $GITHUB_ENV
+          
+          # Report results
+          if [ $FORMAT_EXIT_CODE -ne 0 ]; then
+            echo "⚠️ Formatting issues found:"
+            cat format_output.txt
             echo "::error::Code formatting issues found. Run 'cargo fmt' locally to fix."
-            exit 1
-          fi 
+          else
+            echo "✅ Code formatting looks good!"
+          fi
+      
+      - name: Comment PR with format issues
+        if: github.event_name == 'pull_request' && env.FORMAT_EXIT_CODE != '0'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const output = fs.readFileSync('format_output.txt', 'utf8');
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: "## Format Check Failed\n\nPlease run `cargo fmt` locally to fix formatting issues.\n\n```\n" + output + "\n```"
+            });
+      
+      - name: Fail if formatting issues were found
+        if: env.FORMAT_EXIT_CODE != '0'
+        run: exit 1 
