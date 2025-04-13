@@ -44,28 +44,62 @@ jobs:
           if [ $FORMAT_EXIT_CODE -ne 0 ]; then
             echo "⚠️ Formatting issues found:"
             cat format_output.txt
+            # Create a flag to indicate formatting issues were found
+            echo "has_format_issues=true" >> $GITHUB_OUTPUT
           else
             echo "✅ Code formatting looks good!"
+            echo "has_format_issues=false" >> $GITHUB_OUTPUT
           fi
           
           # Make sure we let the workflow continue to comment on PR
           exit 0
       
       - name: Comment PR with format issues
-        if: github.event_name == 'pull_request' && steps.format_check.outputs.format_exit_code != '0'
+        if: github.event_name == 'pull_request' && steps.format_check.outputs.has_format_issues == 'true'
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
+            // Explicitly check if the file exists first
             const fs = require('fs');
-            const output = fs.readFileSync('format_output.txt', 'utf8');
             
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: "## ❌ Format Check Failed\n\nPlease run `cargo fmt` locally to fix formatting issues.\n\n```\n" + output + "\n```"
-            });
+            if (!fs.existsSync('format_output.txt')) {
+              console.log('Warning: format_output.txt does not exist');
+              return;
+            }
+            
+            try {
+              // Read the format output
+              const output = fs.readFileSync('format_output.txt', 'utf8');
+              
+              // Create a more detailed comment with instructions
+              const comment = `## ❌ Format Check Failed
+            
+            Your PR has code formatting issues. Please run \`cargo fmt\` locally to fix them.
+            
+            ### Format Output:
+            \`\`\`
+            ${output}
+            \`\`\`
+            
+            ### How to fix:
+            1. Run \`cargo fmt\` in your local repository
+            2. Commit and push the changes
+            3. The CI will run again and should pass this check
+            `;
+              
+              // Post the comment on the PR
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: comment
+              });
+              
+              console.log('Successfully posted format issues comment to PR');
+            } catch (error) {
+              console.error('Error posting format issues comment:', error);
+            }
       
       - name: Determine overall success
         if: always()
