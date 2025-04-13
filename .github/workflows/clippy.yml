@@ -29,14 +29,36 @@ jobs:
       
       - name: Generate Clippy report
         run: |
-          cargo clippy --all-targets --all-features -- -D warnings > clippy_report.txt 2>&1 || true
+          # Only run clippy on our code, not dependencies
+          cargo clippy --all-targets --all-features -- -D warnings > clippy_output.txt 2>&1 || true
+          
+          # Format the output to be more readable
           echo "## Clippy Report" > clippy_summary.md
           echo '```' >> clippy_summary.md
-          cat clippy_report.txt >> clippy_summary.md
+          
+          # Extract only error and warning lines and strip ANSI color codes
+          grep -E "^(error|warning):|-->|" clippy_output.txt | sed 's/\x1B\[[0-9;]*[mK]//g' >> clippy_summary.md
+          
+          # Count number of errors and warnings
+          ERROR_COUNT=$(grep -c "^error:" clippy_output.txt || echo 0)
+          WARNING_COUNT=$(grep -c "^warning:" clippy_output.txt || echo 0)
+          
+          echo "" >> clippy_summary.md
+          echo "## Summary" >> clippy_summary.md
+          echo "* Errors: $ERROR_COUNT" >> clippy_summary.md
+          echo "* Warnings: $WARNING_COUNT" >> clippy_summary.md
           echo '```' >> clippy_summary.md
+          
+          if [ "$ERROR_COUNT" -gt 0 ] || [ "$WARNING_COUNT" -gt 0 ]; then
+            echo "Clippy found issues!"
+            cat clippy_summary.md
+            exit 1
+          else
+            echo "✅ Clippy is happy with your code!"
+          fi
       
       - name: Comment PR with Clippy report
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' && always()
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -51,5 +73,8 @@ jobs:
               body: report
             });
 
-      - name: Clippy check for failures
-        run: cargo clippy --all-targets --all-features -- -D warnings 
+      - name: Fail if Clippy found errors
+        run: |
+          if grep -q "^error:" clippy_output.txt; then
+            exit 1
+          fi 

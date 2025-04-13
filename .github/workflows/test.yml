@@ -8,6 +8,11 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+  CARGO_NET_RETRY: 10
+  RUSTUP_MAX_RETRIES: 10
+  # Skip downloading dependencies output
+  CARGO_LOG: cargo::core::resolver=error
 
 jobs:
   test:
@@ -49,4 +54,4 @@ jobs:
           EOL
 
       - name: Run tests
-        run: cargo test --verbose 
+        run: cargo test --quiet 
