@@ -86,12 +86,12 @@ jobs:
           echo "clippy_exit_code=$CLIPPY_EXIT_CODE" >> $GITHUB_OUTPUT
           
           # Only treat compilation errors as failures, not linting warnings
-          if [[ $ERROR_COUNT -gt 0 && $CLIPPY_EXIT_CODE -ne 0 ]]; then
+          if [ "$ERROR_COUNT" -gt 0 ] && [ "$CLIPPY_EXIT_CODE" -ne 0 ]; then
             echo "reason=clippy_errors" >> $GITHUB_OUTPUT
             echo "⚠️ Clippy found errors! Exit code: $CLIPPY_EXIT_CODE"
             cat clippy_summary.md
           else
-            if [ $WARNING_COUNT -gt 0 ]; then
+            if [ "$WARNING_COUNT" -gt 0 ]; then
               echo "⚠️ Clippy found $WARNING_COUNT warnings, but no errors. Build will pass."
             else
               echo "✅ Clippy is happy with your code!"
@@ -170,10 +170,10 @@ jobs:
           echo "Error count: $ERROR_COUNT"
           echo "Clippy exit code: $CLIPPY_EXIT_CODE"
           
-          if [[ "$COMPILE_EXIT_CODE" != "0" && "$COMPILE_EXIT_CODE" != "" ]]; then
+          if [ -n "$COMPILE_EXIT_CODE" ] && [ "$COMPILE_EXIT_CODE" -ne 0 ]; then
             echo "::error::Compilation failed. Please fix the errors before proceeding."
             exit 1
-          elif [[ "$CLIPPY_REASON" == "clippy_errors" || ( "$ERROR_COUNT" != "0" && "$ERROR_COUNT" != "" && "$CLIPPY_EXIT_CODE" != "0" ) ]]; then
+          elif [ "$CLIPPY_REASON" = "clippy_errors" ] || ([ -n "$ERROR_COUNT" ] && [ "$ERROR_COUNT" -ne 0 ] && [ -n "$CLIPPY_EXIT_CODE" ] && [ "$CLIPPY_EXIT_CODE" -ne 0 ]); then
             echo "::error::Clippy found errors. Please fix them before merging."
             exit 1
           else

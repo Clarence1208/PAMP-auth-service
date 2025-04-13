@@ -25,25 +25,34 @@ jobs:
           components: rustfmt
 
       - name: Check formatting
+        id: format_check
         run: |
+          # Turn off automatic exit on error
+          set +e
+          
           # Run the format check and capture the output
           cargo fmt --all -- --check > format_output.txt 2>&1
           FORMAT_EXIT_CODE=$?
           
+          # Turn automatic exit on error back on
+          set -e
+          
           # Store the exit code for later steps
-          echo "FORMAT_EXIT_CODE=$FORMAT_EXIT_CODE" >> $GITHUB_ENV
+          echo "format_exit_code=$FORMAT_EXIT_CODE" >> $GITHUB_OUTPUT
           
           # Report results
           if [ $FORMAT_EXIT_CODE -ne 0 ]; then
             echo "⚠️ Formatting issues found:"
             cat format_output.txt
-            echo "::error::Code formatting issues found. Run 'cargo fmt' locally to fix."
           else
             echo "✅ Code formatting looks good!"
           fi
+          
+          # Make sure we let the workflow continue to comment on PR
+          exit 0
       
       - name: Comment PR with format issues
-        if: github.event_name == 'pull_request' && env.FORMAT_EXIT_CODE != '0'
+        if: github.event_name == 'pull_request' && steps.format_check.outputs.format_exit_code != '0'
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -55,9 +64,20 @@ jobs:
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: "## Format Check Failed\n\nPlease run `cargo fmt` locally to fix formatting issues.\n\n```\n" + output + "\n```"
+              body: "## ❌ Format Check Failed\n\nPlease run `cargo fmt` locally to fix formatting issues.\n\n```\n" + output + "\n```"
             });
       
-      - name: Fail if formatting issues were found
-        if: env.FORMAT_EXIT_CODE != '0'
-        run: exit 1 
+      - name: Determine overall success
+        if: always()
+        run: |
+          FORMAT_EXIT_CODE="${{ steps.format_check.outputs.format_exit_code }}"
+          
+          echo "Format exit code: $FORMAT_EXIT_CODE"
+          
+          if [[ "$FORMAT_EXIT_CODE" != "0" && "$FORMAT_EXIT_CODE" != "" ]]; then
+            echo "::error::Code formatting issues found. Run 'cargo fmt' locally to fix."
+            exit 1
+          else
+            echo "::notice::Format check completed successfully."
+            exit 0
+          fi 
