@@ -16,6 +16,9 @@ jobs:
   format:
     name: Format
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
     steps:
       - uses: actions/checkout@v4
 
@@ -53,7 +56,7 @@ jobs:
           
           # Make sure we let the workflow continue to comment on PR
           exit 0
-      
+
       - name: Comment PR with format issues
         if: github.event_name == 'pull_request' && steps.format_check.outputs.has_format_issues == 'true'
         uses: actions/github-script@v7
@@ -71,7 +74,7 @@ jobs:
             try {
               // Read the format output
               const output = fs.readFileSync('format_output.txt', 'utf8');
-              
+            
               // Create a more detailed comment with instructions
               const comment = `## ❌ Format Check Failed
             
@@ -87,7 +90,7 @@ jobs:
             2. Commit and push the changes
             3. The CI will run again and should pass this check
             `;
-              
+            
               // Post the comment on the PR
               await github.rest.issues.createComment({
                 issue_number: context.issue.number,
@@ -95,12 +98,12 @@ jobs:
                 repo: context.repo.repo,
                 body: comment
               });
-              
+            
               console.log('Successfully posted format issues comment to PR');
             } catch (error) {
               console.error('Error posting format issues comment:', error);
             }
-      
+
       - name: Determine overall success
         if: always()
         run: |
