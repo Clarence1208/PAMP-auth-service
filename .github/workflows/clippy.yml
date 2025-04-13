@@ -109,7 +109,7 @@ jobs:
             cat clippy_summary.md
           else
             if [ "$WARNING_COUNT" != "0" ]; then
-              echo "⚠️ Clippy found $WARNING_COUNT warnings, but no errors. Build will pass."
+              echo "⚠️ Clippy found ${WARNING_COUNT} warnings, but no errors. Build will pass."
             else
               echo "✅ Clippy is happy with your code!"
             fi
@@ -140,37 +140,49 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const fs = require('fs');
-            const report = fs.readFileSync('clippy_summary.md', 'utf8');
-            
-            let reason = 'unknown';
-            if ('${{ steps.compile_check.outputs.reason }}' !== '') {
-              reason = '${{ steps.compile_check.outputs.reason }}';
-            } else if ('${{ steps.clippy_check.outputs.reason }}' !== '') {
-              reason = '${{ steps.clippy_check.outputs.reason }}';
+            try {
+              const fs = require('fs');
+              
+              if (!fs.existsSync('clippy_summary.md')) {
+                console.log('Warning: clippy_summary.md does not exist');
+                return;
+              }
+              
+              const report = fs.readFileSync('clippy_summary.md', 'utf8');
+              
+              let reason = 'unknown';
+              if ('${{ steps.compile_check.outputs.reason }}' !== '') {
+                reason = '${{ steps.compile_check.outputs.reason }}';
+              } else if ('${{ steps.clippy_check.outputs.reason }}' !== '') {
+                reason = '${{ steps.clippy_check.outputs.reason }}';
+              }
+              
+              const hasWarnings = '${{ steps.clippy_check.outputs.has_warnings }}' === 'true';
+              const hasErrors = '${{ steps.clippy_check.outputs.has_errors }}' === 'true';
+              
+              let title = "## Clippy Analysis Results";
+              
+              if (reason === 'compilation_error') {
+                title = "## ❌ Compilation Failed";
+              } else if (reason === 'clippy_errors' || hasErrors) {
+                title = "## ❌ Clippy Found Errors";
+              } else if (hasWarnings) {
+                title = "## ⚠️ Clippy Found Warnings (Build Passed)";
+              } else {
+                title = "## ✅ Clippy Analysis Passed";
+              }
+              
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: `${title}\n\n${report}`
+              });
+              
+              console.log('Successfully posted Clippy report to PR');
+            } catch (error) {
+              console.error('Error posting Clippy report:', error);
             }
-            
-            const hasWarnings = '${{ steps.clippy_check.outputs.has_warnings }}' === 'true';
-            const hasErrors = '${{ steps.clippy_check.outputs.has_errors }}' === 'true';
-            
-            let title = "## Clippy Analysis Results";
-            
-            if (reason === 'compilation_error') {
-              title = "## ❌ Compilation Failed";
-            } else if (reason === 'clippy_errors' || hasErrors) {
-              title = "## ❌ Clippy Found Errors";
-            } else if (hasWarnings) {
-              title = "## ⚠️ Clippy Found Warnings (Build Passed)";
-            } else {
-              title = "## ✅ Clippy Analysis Passed";
-            }
-            
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: `${title}\n\n${report}`
-            });
 
       - name: Determine overall success
         if: always()
