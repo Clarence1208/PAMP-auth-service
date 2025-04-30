@@ -24,6 +24,8 @@ use providers::google_provider::init_google_client;
 use api_docs::ApiDoc;
 use db::{init_db, ensure_schema_exists};
 
+use tower_http::cors::{CorsLayer, Any};
+
 // fixme Simple in-memory storage for OAuth state and verifiers
 #[derive(Clone)]
 pub struct OAuthState {
@@ -81,6 +83,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/auth/google", get(auth_google::google_login))
         .route("/auth/callback/google", get(auth_google::google_callback));
 
+    let cors_layer = CorsLayer::new()
+    .allow_origin(Any); //fixme: when we have the prod url
+
     let app = Router::new()
         .route("/", get(|| async { "Hello from Auth Service!" }))
         .merge(auth_routes)
@@ -89,6 +94,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             SwaggerUi::new("/swagger-ui")
                 .url("/api-docs/openapi.json", openapi)
         )
+        .layer(cors_layer)
         .layer(Extension(google_client))
         .layer(Extension(oauth_state))
         .layer(Extension(Arc::new(db)));
