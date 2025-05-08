@@ -86,21 +86,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     let auth_routes = Router::new()
-        .route("/auth/google", get(auth_google::google_login))
+        .route("/auth/gooogle", get(auth_google::google_login))
         .route("/auth/callback/google", get(auth_google::google_callback));
 
     let cors_layer = CorsLayer::new().allow_origin(Any); //fixme: when we have the prod url
 
-    const UI_ROOT: &str = "/swagger-ui/{_:.*}";
-    const SPEC_ROUTE: &str = "/api-docs/openapi.json";
-
-    let swagger_routes = SwaggerUi::new(UI_ROOT)
-        //expose the OpenAPI JSON inside the app
-        .url(SPEC_ROUTE, openapi)
-        // tell the HTML to fetch that JSON *relatively*
-        //     ─ “../api-docs/openapi.json” works both:
-        //       • behind a prefix → /<prefix>/api-docs/openapi.json
-        //       • locally → /api-docs/openapi.json
+    let swagger_routes = SwaggerUi::new("/swagger-ui/{_:.*}")
+        .url("/api-docs/openapi.json", openapi)
         .config(Config::from("../api-docs/openapi.json"));
 
     let app = Router::new()
@@ -110,7 +102,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // foolproofing the swagger ui (PS: I'm the fool xd)
         .route(
             "/swagger-ui",
-            get(|| async { Redirect::permanent("/swagger-ui/") }),
+            get(|| async { Redirect::permanent("../swagger-ui/") }),
         )
         .merge(swagger_routes)
         .layer(cors_layer)
