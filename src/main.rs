@@ -24,7 +24,7 @@ use handlers::auth_handler;
 use handlers::google_handler as auth_google;
 use providers::google_provider::init_google_client;
 
-use tower_http::cors::{CorsLayer, Any};
+use tower_http::cors::{Any, CorsLayer};
 
 // fixme Simple in-memory storage for OAuth state and verifiers
 #[derive(Clone)]
@@ -70,7 +70,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     dotenv().ok();
 
     let db = init_db().await?;
-    
+
     ensure_schema_exists(&db).await?;
     tracing::info!("Database schema initialized");
 
@@ -88,24 +88,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/auth/google", get(auth_google::google_login))
         .route("/auth/callback/google", get(auth_google::google_callback));
 
-    let cors_layer = CorsLayer::new()
-    .allow_origin(Any); //fixme: when we have the prod url
+    let cors_layer = CorsLayer::new().allow_origin(Any); //fixme: when we have the prod url
 
     let app = Router::new()
         .route("/", get(|| async { "Hello from Auth Service!" }))
         .merge(auth_routes)
         .merge(api_routes)
-        .merge(
-            SwaggerUi::new("/swagger-ui")
-                .url("/api-docs/openapi.json", openapi)
-        )
+        .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", openapi))
         .layer(cors_layer)
         .layer(Extension(google_client))
         .layer(Extension(oauth_state))
         .layer(Extension(Arc::new(db)));
 
     start_server(app).await?;
-    
+
     Ok(())
 }
 
