@@ -1,3 +1,4 @@
+use axum::response::Redirect;
 use axum::{
     routing::{get, post},
     Extension, Router,
@@ -8,7 +9,7 @@ use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use utoipa::OpenApi;
-use utoipa_swagger_ui::SwaggerUi;
+use utoipa_swagger_ui::{Config, SwaggerUi};
 
 mod api_docs;
 mod auth;
@@ -90,11 +91,28 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let cors_layer = CorsLayer::new().allow_origin(Any); //fixme: when we have the prod url
 
+    const UI_ROOT: &str = "/swagger-ui/{_:.*}";
+    const SPEC_ROUTE: &str = "/api-docs/openapi.json";
+
+    let swagger_routes = SwaggerUi::new(UI_ROOT)
+        //expose the OpenAPI JSON inside the app
+        .url(SPEC_ROUTE, openapi)
+        // tell the HTML to fetch that JSON *relatively*
+        //     ─ “../api-docs/openapi.json” works both:
+        //       • behind a prefix → /<prefix>/api-docs/openapi.json
+        //       • locally → /api-docs/openapi.json
+        .config(Config::from("../api-docs/openapi.json"));
+
     let app = Router::new()
         .route("/", get(|| async { "Hello from Auth Service!" }))
         .merge(auth_routes)
         .merge(api_routes)
-        .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", openapi))
+        // foolproofing the swagger ui (PS: I'm the fool xd)
+        .route(
+            "/swagger-ui",
+            get(|| async { Redirect::permanent("/swagger-ui/") }),
+        )
+        .merge(swagger_routes)
         .layer(cors_layer)
         .layer(Extension(google_client))
         .layer(Extension(oauth_state))
