@@ -15,22 +15,12 @@ This directory contains GitHub Actions workflows for continuous integration and 
 - Configured with test environment variables
 - Runs on all PRs and pushes to master
 
-### 3. Clippy Analysis (`clippy.yml`) 
-- Performs code analysis with Clippy to find issues
-- Generates a report and comments on PRs with the results
-- Formatted to show only relevant error information without dependency noise
-- Runs on all PRs and pushes to master
-- **Distinguishes between different types of issues**:
-  - Compilation errors (fails the build)
-  - Clippy errors (fails the build)
-  - Clippy warnings (build passes)
-
-### 4. Docker Build (`build.yml`)
+### 3. Docker Build (`build.yml`)
 - Builds and publishes the Docker image to GitHub Container Registry
 - Only runs on pushes to master or tags
 - Creates appropriate tags including latest, branch name, and version tags
 
-### 5. Release Creation (`release.yml`)
+### 4. Release Creation (`release.yml`)
 - Creates GitHub releases when tags are pushed
 - Generates a changelog from commit messages
 - Provides Docker image information in the release notes
