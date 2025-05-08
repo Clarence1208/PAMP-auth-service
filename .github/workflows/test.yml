@@ -1,0 +1,57 @@
+name: Tests
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+  CARGO_NET_RETRY: 10
+  RUSTUP_MAX_RETRIES: 10
+  # Skip downloading dependencies output
+  CARGO_LOG: cargo::core::resolver=error
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+          POSTGRES_DB: pamp_auth_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Copy example .env file
+        run: |
+          cat > .env << EOL
+          DATABASE_URL=postgres://postgres:postgres@localhost:5432/pamp_auth_test
+          JWT_SECRET=test_secret_for_ci
+          JWT_EXPIRATION=3600
+          GOOGLE_CLIENT_ID=test_client_id
+          GOOGLE_CLIENT_SECRET=test_client_secret
+          GOOGLE_REDIRECT_URL=http://localhost:3000/auth/google/callback
+          EOL
+
+      - name: Run tests
+        run: cargo test --quiet 

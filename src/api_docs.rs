@@ -1,5 +1,5 @@
-use utoipa::{OpenApi, ToSchema};
 use serde::{Deserialize, Serialize};
+use utoipa::{OpenApi, ToSchema};
 
 /// Authentication response after successful login
 #[derive(Serialize, Deserialize, ToSchema)]
@@ -32,8 +32,8 @@ pub struct CallbackParams {
     ),
     components(
         schemas(
-            AuthResponse, 
-            ErrorResponse, 
+            AuthResponse,
+            ErrorResponse,
             CallbackParams,
             crate::entities::user::RegisterTeacherRequest,
             crate::entities::user::UserRole,
@@ -49,4 +49,4 @@ pub struct CallbackParams {
         description = "API for handling authentication in PAMP services",
     )
 )]
-pub struct ApiDoc; 
+pub struct ApiDoc;

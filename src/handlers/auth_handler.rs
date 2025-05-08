@@ -1,3 +1,7 @@
+use argon2::{
+    password_hash::{rand_core::OsRng, SaltString},
+    Argon2, PasswordHasher,
+};
 use axum::{
     extract::{Extension, Json},
     http::StatusCode,
@@ -6,15 +10,9 @@ use axum::{
 use sea_orm::DatabaseConnection;
 use std::sync::Arc;
 use validator::Validate;
-use argon2::{
-    password_hash::{rand_core::OsRng, SaltString},
-    Argon2, PasswordHasher,
-};
 
 use crate::{
-    api_docs::ErrorResponse,
-    entities::user::RegisterTeacherRequest,
-    services::user_service,
+    api_docs::ErrorResponse, entities::user::RegisterTeacherRequest, services::user_service,
 };
 
 #[utoipa::path(
@@ -87,13 +85,7 @@ pub async fn register_teacher(
     };
 
     // Create new teacher user
-    match user_service::create_teacher(
-        db.as_ref(),
-        payload,
-        Some(password_hash),
-    )
-    .await
-    {
+    match user_service::create_teacher(db.as_ref(), payload, Some(password_hash)).await {
         Ok(_) => StatusCode::CREATED.into_response(),
         Err(e) => {
             tracing::error!("Failed to create user: {:?}", e);
@@ -106,4 +98,4 @@ pub async fn register_teacher(
                 .into_response()
         }
     }
-} 
+}

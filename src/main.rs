@@ -6,25 +6,25 @@ use dotenvy::dotenv;
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
+mod api_docs;
+mod auth;
+mod db;
+mod entities;
 mod handlers;
 mod providers;
-mod api_docs;
-mod entities;
-mod db;
-mod auth;
 mod services;
 
-use handlers::google_handler as auth_google;
-use handlers::auth_handler;
-use providers::google_provider::init_google_client;
 use api_docs::ApiDoc;
-use db::{init_db, ensure_schema_exists};
+use db::{ensure_schema_exists, init_db};
+use handlers::auth_handler;
+use handlers::google_handler as auth_google;
+use providers::google_provider::init_google_client;
 
-use tower_http::cors::{CorsLayer, Any};
+use tower_http::cors::{Any, CorsLayer};
 
 // fixme Simple in-memory storage for OAuth state and verifiers
 #[derive(Clone)]
@@ -40,14 +40,17 @@ impl OAuthState {
     }
 
     pub fn set(&self, state: String, verifier: String) {
-        let mut states = self.states.lock()
+        let mut states = self
+            .states
+            .lock()
             .map_err(|_| "Failed to lock mutex")
             .expect("Failed to lock OAuth state mutex");
         states.insert(state, verifier);
     }
 
     pub fn get(&self, state: String) -> Option<String> {
-        let states = self.states
+        let states = self
+            .states
             .lock()
             .map_err(|_| "Failed to lock mutex")
             .expect("Failed to lock OAuth state mutex");
@@ -67,7 +70,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     dotenv().ok();
 
     let db = init_db().await?;
-    
+
     ensure_schema_exists(&db).await?;
     tracing::info!("Database schema initialized");
 
@@ -76,31 +79,29 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let openapi = ApiDoc::openapi();
 
-    let api_routes = Router::new()
-        .route("/auth/register/teacher", post(auth_handler::register_teacher));
+    let api_routes = Router::new().route(
+        "/auth/register/teacher",
+        post(auth_handler::register_teacher),
+    );
 
     let auth_routes = Router::new()
         .route("/auth/google", get(auth_google::google_login))
         .route("/auth/callback/google", get(auth_google::google_callback));
 
-    let cors_layer = CorsLayer::new()
-    .allow_origin(Any); //fixme: when we have the prod url
+    let cors_layer = CorsLayer::new().allow_origin(Any); //fixme: when we have the prod url
 
     let app = Router::new()
         .route("/", get(|| async { "Hello from Auth Service!" }))
         .merge(auth_routes)
         .merge(api_routes)
-        .merge(
-            SwaggerUi::new("/swagger-ui")
-                .url("/api-docs/openapi.json", openapi)
-        )
+        .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", openapi))
         .layer(cors_layer)
         .layer(Extension(google_client))
         .layer(Extension(oauth_state))
         .layer(Extension(Arc::new(db)));
 
     start_server(app).await?;
-    
+
     Ok(())
 }
 
