@@ -84,7 +84,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     let auth_routes = Router::new()
-        .route("/auth/gooogle", get(auth_google::google_login))
+        .route("/auth/google", get(auth_google::google_login))
         .route("/auth/callback/google", get(auth_google::google_callback));
 
     let openapi = ApiDoc::openapi();
