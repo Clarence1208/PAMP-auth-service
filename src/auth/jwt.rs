@@ -6,12 +6,16 @@ use std::env;
 use uuid::Uuid;
 
 #[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone)]
 pub struct Claims {
-    pub subject: String,
+    // Standard JWT claims
+    pub sub: String,        // subject (user ID)
+    pub exp: i64,           // expiration time
+    pub iat: i64,           // issued at
+    
+    // Custom claims
     pub email: String,
     pub role: String,
-    pub issued_at: i64,
-    pub expiration_time: i64,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -35,11 +39,14 @@ pub fn create_token(user_id: Uuid, email: &str, role: &UserRole) -> Result<Strin
     let expires_at = now + Duration::hours(24);
 
     let claims = Claims {
-        subject: user_id.to_string(),
+        // Standard claims
+        sub: user_id.to_string(),
+        iat: now.timestamp(),
+        exp: expires_at.timestamp(),
+        
+        // Custom claims
         email: email.to_string(),
         role: role_str.to_string(),
-        issued_at: now.timestamp(),
-        expiration_time: expires_at.timestamp(),
     };
 
     encode(
@@ -54,7 +61,8 @@ pub fn validate_token(token: &str) -> Result<Claims, JwtError> {
     let jwt_secret =
         env::var("JWT_SECRET").map_err(|_| JwtError::Config("JWT_SECRET not set".to_string()))?;
 
-    let validation = Validation::default();
+    let mut validation = Validation::default();
+    validation.validate_exp = true; // Ensure expiration validation is enabled
 
     let token_data = decode::<Claims>(
         token,

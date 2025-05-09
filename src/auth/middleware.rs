@@ -54,17 +54,42 @@ pub async fn auth_middleware(request: Request, next: Next) -> Response {
 
     // Validate token
     match jwt::validate_token(token) {
-        Ok(_claims) => {
+        Ok(claims) => {
             // Token is valid, continue to handler
-            // Future enhancement: Store claims in request extensions for access in handlers
+            let mut request = request;
+            
+            // Store claims in request extensions for access in handlers
+            request.extensions_mut().insert(claims);
+            
             next.run(request).await
         }
-        Err(_) => (
-            StatusCode::UNAUTHORIZED,
-            Json(ErrorResponse {
-                message: "Invalid or expired token".to_string(),
-            }),
-        )
-            .into_response(),
+        Err(e) => {
+            // Log the error for debugging
+            tracing::error!("JWT validation error: {:?}", e);
+            
+            // Return a more detailed error message in development mode
+            #[cfg(debug_assertions)]
+            {
+                return (
+                    StatusCode::UNAUTHORIZED,
+                    Json(ErrorResponse {
+                        message: format!("Token validation error: {:?}", e),
+                    }),
+                )
+                    .into_response();
+            }
+            
+            // Return a generic error message in production
+            #[cfg(not(debug_assertions))]
+            {
+                return (
+                    StatusCode::UNAUTHORIZED,
+                    Json(ErrorResponse {
+                        message: "Invalid or expired token".to_string(),
+                    }),
+                )
+                    .into_response();
+            }
+        }
     }
 }

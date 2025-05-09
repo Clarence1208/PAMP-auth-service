@@ -69,3 +69,39 @@ pub struct RegisterTeacherRequest {
     #[validate(length(min = 1, message = "Last name is required"))]
     pub last_name: String,
 }
+
+// Login request model with validation
+#[derive(Debug, Deserialize, Serialize, ToSchema, Validate)]
+pub struct LoginRequest {
+    #[schema(examples("john.doe@email.com"))]
+    #[validate(email(message = "Invalid email format"))]
+    pub email: String,
+    #[schema(examples("password123"))]
+    #[validate(length(min = 1, message = "Password is required"))]
+    pub password: String,
+}
+
+/// Data Transfer Object for User information
+/// Contains only the non-sensitive user information
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct UserDTO {
+    pub user_id: Uuid,
+    pub email: String,
+    pub first_name: String,
+    pub last_name: String,
+    pub role: UserRole,
+    pub is_active: bool,
+}
+
+impl From<Model> for UserDTO {
+    fn from(model: Model) -> Self {
+        Self {
+            user_id: model.user_id,
+            email: model.email,
+            first_name: model.first_name,
+            last_name: model.last_name,
+            role: UserRole::from(model.role),
+            is_active: model.is_active,
+        }
+    }
+}
