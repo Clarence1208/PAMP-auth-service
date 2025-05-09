@@ -7,6 +7,10 @@ use uuid::Uuid;
 use crate::entities::user::RegisterTeacherRequest;
 use crate::entities::user::{ActiveModel, Column, Entity as User, Model, UserRole};
 
+pub async fn find_by_id(db: &DatabaseConnection, user_id: Uuid) -> Result<Option<Model>, DbErr> {
+    User::find().filter(Column::UserId.eq(user_id)).one(db).await
+}
+
 pub async fn find_by_email(db: &DatabaseConnection, email: &str) -> Result<Option<Model>, DbErr> {
     User::find().filter(Column::Email.eq(email)).one(db).await
 }

@@ -29,6 +29,9 @@ pub struct CallbackParams {
         crate::handlers::google_handler::google_login,
         crate::handlers::google_handler::google_callback,
         crate::handlers::auth_handler::register_teacher,
+        crate::handlers::auth_handler::get_current_user,
+        crate::handlers::auth_handler::login_teacher,
+        crate::handlers::auth_handler::debug_token,
     ),
     components(
         schemas(
@@ -36,8 +39,10 @@ pub struct CallbackParams {
             ErrorResponse,
             CallbackParams,
             crate::entities::user::RegisterTeacherRequest,
+            crate::entities::user::LoginRequest,
             crate::entities::user::UserRole,
-            crate::entities::user::Model
+            crate::entities::user::Model,
+            crate::entities::user::UserDTO
         )
     ),
     tags(

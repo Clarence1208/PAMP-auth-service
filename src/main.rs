@@ -20,6 +20,7 @@ mod providers;
 mod services;
 
 use api_docs::ApiDoc;
+use auth::middleware::auth_middleware;
 use db::{ensure_schema_exists, init_db};
 use handlers::auth_handler;
 use handlers::google_handler as auth_google;
@@ -78,10 +79,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let google_client = Arc::new(init_google_client());
     let oauth_state = OAuthState::new();
 
-    let api_routes = Router::new().route(
-        "/auth/register/teacher",
-        post(auth_handler::register_teacher),
-    );
+    let api_routes = Router::new()
+        .route(
+            "/auth/register/teacher",
+            post(auth_handler::register_teacher),
+        )
+        .route("/auth/login/teacher", post(auth_handler::login_teacher))
+        .route("/auth/debug-token", post(auth_handler::debug_token))
+        .route("/me", get(auth_handler::get_current_user).route_layer(axum::middleware::from_fn(auth_middleware)));
 
     let auth_routes = Router::new()
         .route("/auth/google", get(auth_google::google_login))
