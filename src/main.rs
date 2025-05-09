@@ -95,7 +95,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/", get(|| async { "Hello from Auth Service!" }))
         .merge(auth_routes)
         .merge(api_routes)
-        .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", openapi, ))
+        .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", openapi))
         .layer(cors_layer)
         .layer(Extension(google_client))
         .layer(Extension(oauth_state))

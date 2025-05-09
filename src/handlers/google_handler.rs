@@ -14,6 +14,7 @@ use sea_orm::DatabaseConnection;
 use serde_json::Value;
 use std::any::Any;
 use std::collections::HashMap;
+use std::env;
 use std::sync::Arc;
 
 #[utoipa::path(
@@ -75,9 +76,7 @@ pub async fn google_login(
         ("state" = String, Query, description = "OAuth state for CSRF protection")
     ),
     responses(
-        (status = 200, description = "Login successful", body = AuthResponse),
-        (status = 401, description = "User not registered", body = ErrorResponse),
-        (status = 400, description = "Bad request", body = ErrorResponse),
+        (status = 302, description = "Redirect to frontend with token or error"),
         (status = 500, description = "Internal server error", body = ErrorResponse)
     )
 )]
@@ -88,29 +87,26 @@ pub async fn google_callback(
     Extension(db): Extension<Arc<DatabaseConnection>>,
     Query(params): Query<HashMap<String, String>>,
 ) -> Response {
+    // Get the frontend URL from environment variables or use a default
+    let frontend_url =
+        env::var("FRONTEND_URL").unwrap_or_else(|_| "http://localhost:5173".to_string());
+
+    // Create the base redirect URL to the frontend's auth callback endpoint
+    let redirect_base = format!("{}/auth/callback", frontend_url);
+
     let code = match params.get("code") {
         Some(code) => code.clone(),
         None => {
-            return (
-                StatusCode::BAD_REQUEST,
-                Json(ErrorResponse {
-                    message: "Param code manquant".to_string(),
-                }),
-            )
-                .into_response()
+            let error_url = format!("{}?error={}", redirect_base, "missing_code_parameter");
+            return Redirect::to(&error_url).into_response();
         }
     };
 
     let state = match params.get("state") {
         Some(state) => state.clone(),
         None => {
-            return (
-                StatusCode::BAD_REQUEST,
-                Json(ErrorResponse {
-                    message: "Param state manquant".to_string(),
-                }),
-            )
-                .into_response()
+            let error_url = format!("{}?error={}", redirect_base, "missing_state_parameter");
+            return Redirect::to(&error_url).into_response();
         }
     };
 
@@ -118,13 +114,8 @@ pub async fn google_callback(
     let verifier = match state_store.get(state) {
         Some(verifier) => verifier,
         None => {
-            return (
-                StatusCode::BAD_REQUEST,
-                Json(ErrorResponse {
-                    message: "Invalid state".to_string(),
-                }),
-            )
-                .into_response()
+            let error_url = format!("{}?error={}", redirect_base, "invalid_state");
+            return Redirect::to(&error_url).into_response();
         }
     };
 
@@ -132,13 +123,9 @@ pub async fn google_callback(
     let oauth_token = match (*client).clone().generate_token(code, verifier).await {
         Ok(token) => token,
         Err(e) => {
-            return (
-                StatusCode::BAD_REQUEST,
-                Json(ErrorResponse {
-                    message: format!("Error exchanging token: {:?}", e.type_id()),
-                }),
-            )
-                .into_response()
+            let error_message = format!("error_exchanging_token_{:?}", e.type_id());
+            let error_url = format!("{}?error={}", redirect_base, error_message);
+            return Redirect::to(&error_url).into_response();
         }
     };
 
@@ -154,13 +141,8 @@ pub async fn google_callback(
         Ok(response) => response,
         Err(e) => {
             tracing::error!("Failed to fetch user info: {:?}", e);
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ErrorResponse {
-                    message: "Failed to fetch user info".to_string(),
-                }),
-            )
-                .into_response();
+            let error_url = format!("{}?error={}", redirect_base, "failed_to_fetch_user_info");
+            return Redirect::to(&error_url).into_response();
         }
     };
 
@@ -168,13 +150,8 @@ pub async fn google_callback(
         Ok(info) => info,
         Err(e) => {
             tracing::error!("Failed to parse user info: {:?}", e);
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ErrorResponse {
-                    message: "Failed to parse user info".to_string(),
-                }),
-            )
-                .into_response();
+            let error_url = format!("{}?error={}", redirect_base, "failed_to_parse_user_info");
+            return Redirect::to(&error_url).into_response();
         }
     };
 
@@ -182,26 +159,16 @@ pub async fn google_callback(
     let email = match user_info.get("email").and_then(|e| e.as_str()) {
         Some(email) => email,
         None => {
-            return (
-                StatusCode::BAD_REQUEST,
-                Json(ErrorResponse {
-                    message: "Email not found in Google profile".to_string(),
-                }),
-            )
-                .into_response();
+            let error_url = format!("{}?error={}", redirect_base, "email_not_found");
+            return Redirect::to(&error_url).into_response();
         }
     };
 
     let google_id = match user_info.get("id").and_then(|id| id.as_str()) {
         Some(id) => id,
         None => {
-            return (
-                StatusCode::BAD_REQUEST,
-                Json(ErrorResponse {
-                    message: "ID not found in Google profile".to_string(),
-                }),
-            )
-                .into_response();
+            let error_url = format!("{}?error={}", redirect_base, "id_not_found");
+            return Redirect::to(&error_url).into_response();
         }
     };
 
@@ -227,36 +194,20 @@ pub async fn google_callback(
                 Ok(Some(user)) => user,
                 Ok(None) => {
                     // User not registered
-                    return (
-                        StatusCode::UNAUTHORIZED,
-                        Json(ErrorResponse {
-                            message: "User not registered. Please register before logging in."
-                                .to_string(),
-                        }),
-                    )
-                        .into_response();
+                    let error_url = format!("{}?error={}", redirect_base, "user_not_registered");
+                    return Redirect::to(&error_url).into_response();
                 }
                 Err(e) => {
                     tracing::error!("Database error checking external auth: {:?}", e);
-                    return (
-                        StatusCode::INTERNAL_SERVER_ERROR,
-                        Json(ErrorResponse {
-                            message: "Database error".to_string(),
-                        }),
-                    )
-                        .into_response();
+                    let error_url = format!("{}?error={}", redirect_base, "database_error");
+                    return Redirect::to(&error_url).into_response();
                 }
             }
         }
         Err(e) => {
             tracing::error!("Database error checking email: {:?}", e);
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ErrorResponse {
-                    message: "Database error".to_string(),
-                }),
-            )
-                .into_response();
+            let error_url = format!("{}?error={}", redirect_base, "database_error");
+            return Redirect::to(&error_url).into_response();
         }
     };
 
@@ -268,16 +219,12 @@ pub async fn google_callback(
         Ok(token) => token,
         Err(e) => {
             tracing::error!("Failed to generate JWT token: {:?}", e);
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ErrorResponse {
-                    message: "Failed to generate JWT token".to_string(),
-                }),
-            )
-                .into_response();
+            let error_url = format!("{}?error={}", redirect_base, "failed_to_generate_token");
+            return Redirect::to(&error_url).into_response();
         }
     };
 
-    // Return the JWT token
-    (StatusCode::OK, Json(AuthResponse { token: jwt_token })).into_response()
+    // Redirect to frontend with the JWT token
+    let success_url = format!("{}?token={}", redirect_base, jwt_token);
+    Redirect::to(&success_url).into_response()
 }

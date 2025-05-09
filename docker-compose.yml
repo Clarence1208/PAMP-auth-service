@@ -30,6 +30,7 @@ services:
       - ./.env:/app/.env
     environment:
       - DATABASE_URL=postgres://postgres:postgres@db:5432/pamp_auth
+      - FRONTEND_URL=http://localhost:5173
 
 volumes:
   postgres_data: 
