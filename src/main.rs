@@ -91,7 +91,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let cors_layer = CorsLayer::new().allow_origin(Any); //fixme: when we have the prod url
 
-    let swagger_routes = SwaggerUi::new("/swagger-ui/{_:.*}")
+    let swagger_routes = SwaggerUi::new("/swagger-ui/*path")
         .url("/api-docs/openapi.json", openapi)
         .config(Config::from("../api-docs/openapi.json"));
 
@@ -102,7 +102,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // foolproofing the swagger ui (PS: I'm the fool xd)
         .route(
             "/swagger-ui",
-            get(|| async { Redirect::permanent("../swagger-ui/") }),
+            get(|| async { Redirect::permanent("./swagger-ui/") }),
         )
         .merge(swagger_routes)
         .layer(cors_layer)
