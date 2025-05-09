@@ -94,7 +94,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // every static file under /swagger-ui/…
     const SWAGGER_ASSETS: &str = "/swagger-ui/{*asset}";
     // the OpenAPI JSON will be served from here *inside the container*
-    const OPENAPI_JSON:  &str = "/api-docs/openapi.json";
+    const OPENAPI_JSON: &str = "/api-docs/openapi.json";
 
     let swagger_routes = SwaggerUi::new(SWAGGER_ASSETS)
         // expose the spec
@@ -103,7 +103,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         //    local → http://127.0.0.1:3000/api-docs/openapi.json
         //   prod → https://edulor.fr/user-api/api-docs/openapi.json
         .config(Config::from("../api-docs/openapi.json"));
-
 
     let app = Router::new()
         .route("/", get(|| async { "Hello from Auth Service!" }))
