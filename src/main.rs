@@ -78,8 +78,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let google_client = Arc::new(init_google_client());
     let oauth_state = OAuthState::new();
 
-    let openapi = ApiDoc::openapi();
-
     let api_routes = Router::new().route(
         "/auth/register/teacher",
         post(auth_handler::register_teacher),
@@ -89,31 +87,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/auth/gooogle", get(auth_google::google_login))
         .route("/auth/callback/google", get(auth_google::google_callback));
 
+    let openapi = ApiDoc::openapi();
+
     let cors_layer = CorsLayer::new().allow_origin(Any); //fixme: when we have the prod url
-
-    // every static file under /swagger-ui/…
-    const SWAGGER_ASSETS: &str = "/swagger-ui/{*asset}";
-    // the OpenAPI JSON will be served from here *inside the container*
-    const OPENAPI_JSON: &str = "/api-docs/openapi.json";
-
-    let swagger_routes = SwaggerUi::new(SWAGGER_ASSETS)
-        // expose the spec
-        .url(OPENAPI_JSON, openapi)
-        // tell the HTML page to fetch it one directory above /swagger-ui/
-        //    local → http://127.0.0.1:3000/api-docs/openapi.json
-        //   prod → https://edulor.fr/user-api/api-docs/openapi.json
-        .config(Config::from("../api-docs/openapi.json"));
 
     let app = Router::new()
         .route("/", get(|| async { "Hello from Auth Service!" }))
         .merge(auth_routes)
         .merge(api_routes)
-        // foolproofing the swagger ui (PS: I'm the fool xd)
-        .route(
-            "/swagger-ui",
-            get(|| async { Redirect::permanent("./swagger-ui/") }),
-        )
-        .merge(swagger_routes)
+        .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", openapi, ))
         .layer(cors_layer)
         .layer(Extension(google_client))
         .layer(Extension(oauth_state))
