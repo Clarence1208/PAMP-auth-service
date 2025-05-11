@@ -24,6 +24,8 @@ This is the authentication service for the PAMP application. It provides endpoin
 - `POST /register/teacher`: Register a new teacher
 - `POST /register/students`: Register multiple students (requires teacher authentication)
 - `GET /me`: Get current user information (requires authentication)
+- `GET /users/{id}`: Get user by ID (requires authentication)
+- `GET /users/email/{email}`: Get user by email (requires authentication)
 
 ### Utilities
 

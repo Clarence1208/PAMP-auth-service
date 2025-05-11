@@ -38,6 +38,8 @@ pub struct CallbackParams {
         crate::handlers::teacher_handler::register_teacher,
         crate::handlers::teacher_handler::login_teacher,
         crate::handlers::user_handler::get_current_user,
+        crate::handlers::user_handler::get_user_by_id,
+        crate::handlers::user_handler::get_user_by_email,
         crate::handlers::debug_handler::debug_token,
         crate::handlers::student_handler::register_students,
     ),
@@ -57,7 +59,8 @@ pub struct CallbackParams {
         )
     ),
     tags(
-        (name = "authentication", description = "Authentication endpoints")
+        (name = "authentication", description = "Authentication endpoints"),
+        (name = "users", description = "User management endpoints")
     ),
     info(
         title = "PAMP Authentication Service API",

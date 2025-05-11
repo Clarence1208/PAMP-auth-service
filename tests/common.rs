@@ -55,6 +55,14 @@ pub fn create_test_app(db: Arc<DatabaseConnection>) -> Router {
             get(handlers::user_handler::get_current_user),
         )
         .route(
+            "/users/email/{email}",
+            get(handlers::user_handler::get_user_by_email),
+        )
+        .route(
+            "/users/{id}",
+            get(handlers::user_handler::get_user_by_id),
+        )
+        .route(
             "/debug-token",
             post(handlers::debug_handler::debug_token),
         )
