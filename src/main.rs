@@ -30,38 +30,7 @@ use handlers::student_handler;
 use handlers::teacher_handler;
 use handlers::user_handler;
 use providers::google_provider::init_google_client;
-
-// fixme Simple in-memory storage for OAuth state and verifiers
-#[derive(Clone)]
-pub struct OAuthState {
-    states: Arc<Mutex<HashMap<String, String>>>,
-}
-
-impl OAuthState {
-    fn new() -> Self {
-        OAuthState {
-            states: Arc::new(Mutex::new(HashMap::new())),
-        }
-    }
-
-    pub fn set(&self, state: String, verifier: String) {
-        let mut states = self
-            .states
-            .lock()
-            .map_err(|_| "Failed to lock mutex")
-            .expect("Failed to lock OAuth state mutex");
-        states.insert(state, verifier);
-    }
-
-    pub fn get(&self, state: String) -> Option<String> {
-        let states = self
-            .states
-            .lock()
-            .map_err(|_| "Failed to lock mutex")
-            .expect("Failed to lock OAuth state mutex");
-        states.get(&state).cloned()
-    }
-}
+use PAMP_auth_service::OAuthState;
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -82,34 +51,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let google_client = Arc::new(init_google_client());
     let oauth_state = OAuthState::new();
 
-    let api_routes = Router::new()
-        .route(
-            "/register/teacher",
-            post(teacher_handler::register_teacher),
-        )
-        .route("/login/teacher", post(teacher_handler::login_teacher))
-        .route("/debug-token", post(debug_handler::debug_token))
-        .route(
-            "/register/students", 
-            post(student_handler::register_students)
-                .route_layer(axum::middleware::from_fn(auth_middleware))
-        )
-        .route("/me", get(user_handler::get_current_user)
-            .route_layer(axum::middleware::from_fn(auth_middleware)));
-
-    let auth_routes = Router::new()
-        .route("/login/google", get(google_handler::google_login))
-        .route("/login/callback/google", get(google_handler::google_callback));
-
-    let openapi = ApiDoc::openapi();
-
     let cors_layer = CorsLayer::new().allow_origin(Any); //fixme: when we have the prod url
 
     let app = Router::new()
         .route("/", get(|| async { "Hello from Auth Service!" }))
-        .merge(auth_routes)
-        .merge(api_routes)
-        .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", openapi))
+        .merge(createGoogleRoutes())
+        .merge(createAPIRoutes())
+        .merge(createSwagger())
         .layer(cors_layer)
         .layer(Extension(google_client))
         .layer(Extension(oauth_state))
@@ -118,6 +66,36 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     start_server(app).await?;
 
     Ok(())
+}
+
+fn createSwagger() -> SwaggerUi {
+    SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi())
+}
+
+fn createAPIRoutes() -> Router {
+    Router::new()
+        .route("/register/teacher", post(teacher_handler::register_teacher))
+        .route("/login/teacher", post(teacher_handler::login_teacher))
+        .route("/debug-token", post(debug_handler::debug_token))
+        .route(
+            "/register/students",
+            post(student_handler::register_students)
+                .route_layer(axum::middleware::from_fn(auth_middleware)),
+        )
+        .route(
+            "/me",
+            get(user_handler::get_current_user)
+                .route_layer(axum::middleware::from_fn(auth_middleware)),
+        )
+}
+
+fn createGoogleRoutes() -> Router {
+    Router::new()
+        .route("/login/google", get(google_handler::google_login))
+        .route(
+            "/login/callback/google",
+            get(google_handler::google_callback),
+        )
 }
 
 async fn start_server(app: Router) -> Result<(), Box<dyn std::error::Error>> {
