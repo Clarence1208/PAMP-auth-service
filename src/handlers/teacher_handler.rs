@@ -225,7 +225,6 @@ pub async fn login_teacher(
         }
     };
 
-    // Return token
     (
         StatusCode::OK,
         Json(AuthResponse { token }),

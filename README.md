@@ -1,80 +1,80 @@
 # PAMP Authentication Service
 
-This is an authentication service for the PAMP platform, providing Google OAuth integration and user management with PostgreSQL database.
+This is the authentication service for the PAMP application. It provides endpoints for user authentication, registration, and token validation.
 
 ## Features
 
-- User registration for teachers
-- Google OAuth authentication
-- JWT token generation and validation
-- API documentation with Swagger UI
-- SeaORM for database operations
-
-## Prerequisites
-
-- Rust 1.76 or later
-- Docker and Docker Compose
-- Google OAuth credentials
-
-## Environment Variables
-
-Create a `.env` file in the project root with the following variables:
-
-```
-DATABASE_URL=postgres://postgres:postgres@localhost:5432/pamp_auth
-GOOGLE_CLIENT_ID=your_google_client_id
-GOOGLE_CLIENT_SECRET=your_google_client_secret
-GOOGLE_REDIRECT_URI=http://localhost:3000/auth/callback/google
-JWT_SECRET=a_secure_random_string
-RUST_LOG=info
-```
-
-## Running with Docker
-
-1. Make sure Docker and Docker Compose are installed
-2. Set up your environment variables in `.env` file
-3. Run the service with Docker Compose:
-
-```bash
-docker-compose up -d
-```
-
-4. Access the service at http://localhost:3000
-5. Access API documentation at http://localhost:3000/swagger-ui
-
-## Development Setup
-
-1. Install Rust (https://www.rust-lang.org/tools/install)
-2. Install PostgreSQL
-3. Create a database for the service
-4. Set up your environment variables
-5. Run the service:
-
-```bash
-cargo run
-```
-
-## Database Management
-
-The service uses SeaORM, which automatically creates the database schema on startup if it doesn't exist. No manual migrations are needed.
+- Teacher registration and login
+- Student registration (by teachers)
+- JWT-based authentication
+- Google OAuth integration
+- User profile retrieval
+- Token debugging
 
 ## API Endpoints
 
-- `GET /` - Health check endpoint
-- `GET /auth/google` - Initiate Google OAuth login
-- `GET /auth/callback/google` - Google OAuth callback
-- `POST /auth/register/teacher` - Register a new teacher
+### Authentication
 
-## User Registration Process
+- `POST /login/teacher`: Login for teachers with email and password
+- `GET /login/google`: Initiate Google OAuth login
+- `GET /login/callback/google`: Google OAuth callback
 
-1. Register a teacher account with `POST /auth/register/teacher`
-2. Login using Google OAuth at `GET /auth/google`
-3. Google redirects to the callback URL with an authorization code
-4. The service verifies the user exists in the database
-5. If the user exists, a JWT token is issued
+### User Management
 
-## Security
+- `POST /register/teacher`: Register a new teacher
+- `POST /register/students`: Register multiple students (requires teacher authentication)
+- `GET /me`: Get current user information (requires authentication)
 
-- Passwords are hashed using Argon2
-- Authentication is handled via JWT tokens
-- CSRF protection is implemented for OAuth flow
+### Utilities
+
+- `POST /debug-token`: Debug a JWT token
+
+## Development
+
+### Prerequisites
+
+- Rust and Cargo
+- PostgreSQL database
+- Environment variables (see `.env.example`)
+
+### Setup
+
+1. Clone the repository
+2. Copy `.env.example` to `.env` and fill in the required variables
+3. Run `cargo build` to build the project
+4. Run `cargo run` to start the server
+
+### Testing
+
+The project includes comprehensive tests for all endpoints and services. To run the tests:
+
+```bash
+cargo test
+```
+
+#### Test Coverage
+
+The test suite includes:
+
+- **Unit Tests**: Testing individual components in isolation
+- **Integration Tests**: Testing API endpoints with mock authentication
+- **Service Tests**: Testing business logic and database operations
+- **JWT Tests**: Testing token creation and validation
+
+## API Documentation
+
+API documentation is available at `/swagger-ui` when the server is running.
+
+## Architecture
+
+The service follows a layered architecture:
+
+- **Handlers**: API endpoint handlers
+- **Services**: Business logic
+- **Entities**: Data models and DTOs
+- **Auth**: Authentication and authorization middleware
+- **DB**: Database connection and schema management
+
+## License
+
+MIT
