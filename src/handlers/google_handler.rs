@@ -1,4 +1,4 @@
-use crate::api_docs::{AuthResponse, ErrorResponse};
+use crate::api_docs::ErrorResponse;
 use crate::auth::jwt;
 use crate::entities::user::UserRole;
 use crate::services::user_service;

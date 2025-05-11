@@ -1,15 +1,17 @@
-use axum::response::Redirect;
 use axum::{
     routing::{get, post},
     Extension, Router,
 };
-use dotenvy::dotenv;
 use std::collections::HashMap;
+use tower_http::cors::{Any, CorsLayer};
+use utoipa::OpenApi;
+use utoipa_swagger_ui::SwaggerUi;
+
+use dotenvy::dotenv;
+use log::info;
 use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
-use utoipa::OpenApi;
-use utoipa_swagger_ui::{Config, SwaggerUi};
 
 mod api_docs;
 mod auth;
@@ -25,8 +27,6 @@ use db::{ensure_schema_exists, init_db};
 use handlers::auth_handler;
 use handlers::google_handler as auth_google;
 use providers::google_provider::init_google_client;
-
-use tower_http::cors::{Any, CorsLayer};
 
 // fixme Simple in-memory storage for OAuth state and verifiers
 #[derive(Clone)]
@@ -74,7 +74,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let db = init_db().await?;
 
     ensure_schema_exists(&db).await?;
-    tracing::info!("Database schema initialized");
+    info!("Database schema initialized");
 
     let google_client = Arc::new(init_google_client());
     let oauth_state = OAuthState::new();
@@ -86,7 +86,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         )
         .route("/auth/login/teacher", post(auth_handler::login_teacher))
         .route("/auth/debug-token", post(auth_handler::debug_token))
-        .route("/me", get(auth_handler::get_current_user).route_layer(axum::middleware::from_fn(auth_middleware)));
+        .route(
+            "/auth/register/students",
+            post(auth_handler::register_students)
+                .route_layer(axum::middleware::from_fn(auth_middleware)),
+        )
+        .route(
+            "/me",
+            get(auth_handler::get_current_user)
+                .route_layer(axum::middleware::from_fn(auth_middleware)),
+        );
 
     let auth_routes = Router::new()
         .route("/auth/google", get(auth_google::google_login))
@@ -113,7 +122,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 async fn start_server(app: Router) -> Result<(), Box<dyn std::error::Error>> {
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
-    tracing::info!("Server started on {}", addr);
+    info!("Server started on {}", addr);
 
     match tokio::net::TcpListener::bind(&addr).await {
         Ok(listener) => {

@@ -81,6 +81,25 @@ pub struct LoginRequest {
     pub password: String,
 }
 
+// Student registration request model with validation
+#[derive(Debug, Clone, Deserialize, Serialize, ToSchema, Validate)]
+pub struct RegisterStudentRequest {
+    #[schema(examples("student@email.com"))]
+    #[validate(email(message = "Invalid email format"))]
+    pub email: String,
+    #[validate(length(min = 1, message = "First name is required"))]
+    pub first_name: String,
+    #[validate(length(min = 1, message = "Last name is required"))]
+    pub last_name: String,
+}
+
+// Bulk student registration request model
+#[derive(Debug, Deserialize, Serialize, ToSchema, Validate)]
+pub struct RegisterStudentsRequest {
+    #[validate(length(min = 1, message = "At least one student must be provided"))]
+    pub students: Vec<RegisterStudentRequest>,
+}
+
 /// Data Transfer Object for User information
 /// Contains only the non-sensitive user information
 #[derive(Debug, Serialize, Deserialize, ToSchema)]

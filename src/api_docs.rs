@@ -13,6 +13,13 @@ pub struct ErrorResponse {
     pub message: String,
 }
 
+/// Student registration response
+#[derive(Serialize, Deserialize, ToSchema)]
+pub struct RegisterStudentsResponse {
+    pub created_count: usize,
+    pub students: Vec<crate::entities::user::UserDTO>,
+}
+
 /// Authentication callback parameters
 #[derive(Deserialize, ToSchema)]
 #[allow(dead_code)]
@@ -32,14 +39,18 @@ pub struct CallbackParams {
         crate::handlers::auth_handler::get_current_user,
         crate::handlers::auth_handler::login_teacher,
         crate::handlers::auth_handler::debug_token,
+        crate::handlers::auth_handler::register_students,
     ),
     components(
         schemas(
             AuthResponse,
             ErrorResponse,
             CallbackParams,
+            RegisterStudentsResponse,
             crate::entities::user::RegisterTeacherRequest,
             crate::entities::user::LoginRequest,
+            crate::entities::user::RegisterStudentRequest,
+            crate::entities::user::RegisterStudentsRequest,
             crate::entities::user::UserRole,
             crate::entities::user::Model,
             crate::entities::user::UserDTO

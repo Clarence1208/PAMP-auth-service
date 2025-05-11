@@ -1,14 +1,18 @@
 use chrono::Utc;
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, DatabaseConnection, DbErr, EntityTrait, QueryFilter, Set,
+    ActiveModelTrait, ColumnTrait, DatabaseConnection, DatabaseTransaction, DbErr, EntityTrait,
+    QueryFilter, Set, TransactionTrait,
 };
 use uuid::Uuid;
 
-use crate::entities::user::RegisterTeacherRequest;
 use crate::entities::user::{ActiveModel, Column, Entity as User, Model, UserRole};
+use crate::entities::user::{RegisterStudentRequest, RegisterTeacherRequest};
 
 pub async fn find_by_id(db: &DatabaseConnection, user_id: Uuid) -> Result<Option<Model>, DbErr> {
-    User::find().filter(Column::UserId.eq(user_id)).one(db).await
+    User::find()
+        .filter(Column::UserId.eq(user_id))
+        .one(db)
+        .await
 }
 
 pub async fn find_by_email(db: &DatabaseConnection, email: &str) -> Result<Option<Model>, DbErr> {
@@ -100,4 +104,57 @@ pub async fn create_or_update_oauth_user(
     };
 
     user.insert(db).await
+}
+
+pub async fn create_student(
+    db: &DatabaseTransaction,
+    request: RegisterStudentRequest,
+) -> Result<Model, DbErr> {
+    let now = Utc::now();
+
+    let user = ActiveModel {
+        user_id: Set(Uuid::new_v4()),
+        email: Set(request.email),
+        password_hash: Set(None), // Students don't have passwords initially
+        first_name: Set(request.first_name),
+        last_name: Set(request.last_name),
+        role: Set(UserRole::Student.to_string()),
+        external_auth_provider: Set(None),
+        external_auth_id: Set(None),
+        is_active: Set(true),
+        created_at: Set(now),
+        updated_at: Set(now),
+    };
+
+    user.insert(db).await
+}
+
+pub async fn create_students(
+    db: &DatabaseConnection,
+    requests: Vec<RegisterStudentRequest>,
+) -> Result<Vec<Model>, DbErr> {
+    // Use a transaction to ensure all students are created or none
+    let txn = db.begin().await?;
+
+    let mut created_students = Vec::with_capacity(requests.len());
+
+    for request in requests {
+        // Check if student with this email already exists
+        let existing_user = User::find()
+            .filter(Column::Email.eq(&request.email))
+            .one(&txn)
+            .await?;
+
+        if existing_user.is_some() {
+            // Skip existing students
+            continue;
+        }
+
+        let student = create_student(&txn, request).await?;
+        created_students.push(student);
+    }
+
+    txn.commit().await?;
+
+    Ok(created_students)
 }
