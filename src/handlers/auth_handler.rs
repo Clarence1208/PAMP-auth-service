@@ -13,7 +13,7 @@ use uuid::Uuid;
 use validator::Validate;
 
 use crate::{
-    api_docs::{ErrorResponse, AuthResponse}, entities::user::{RegisterTeacherRequest, UserDTO, LoginRequest, UserRole}, services::user_service, auth::jwt,
+    api_docs::{ErrorResponse, AuthResponse, RegisterStudentsResponse}, entities::user::{RegisterTeacherRequest, UserDTO, LoginRequest, UserRole, RegisterStudentsRequest}, services::user_service, auth::jwt,
 };
 
 #[utoipa::path(
@@ -418,7 +418,8 @@ pub async fn debug_token(
                         "iat": token_data.claims.iat,
                         "exp": token_data.claims.exp
                     },
-                    "expires_at": chrono::NaiveDateTime::from_timestamp_opt(token_data.claims.exp, 0)
+                    "expires_at": chrono::DateTime::from_timestamp(token_data.claims.exp, 0)
+                        .map(|dt| dt.naive_local())
                         .map(|dt| dt.to_string())
                         .unwrap_or_else(|| "invalid timestamp".to_string())
                 }),
@@ -436,4 +437,88 @@ pub async fn debug_token(
         })),
     )
         .into_response()
+}
+
+#[utoipa::path(
+    post,
+    path = "/auth/register/students",
+    tag = "authentication",
+    security(
+        ("bearer_auth" = [])
+    ),
+    request_body = RegisterStudentsRequest,
+    responses(
+        (status = 201, description = "Students registered successfully", body = RegisterStudentsResponse),
+        (status = 400, description = "Invalid input", body = ErrorResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 403, description = "User is not a teacher", body = ErrorResponse),
+        (status = 500, description = "Internal server error", body = ErrorResponse)
+    )
+)]
+#[axum::debug_handler]
+pub async fn register_students(
+    Extension(db): Extension<Arc<DatabaseConnection>>,
+    claims: axum::extract::Extension<crate::auth::jwt::Claims>,
+    Json(payload): Json<RegisterStudentsRequest>,
+) -> Response {
+    // Validate input
+    if let Err(errors) = payload.validate() {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(ErrorResponse {
+                message: format!("Validation error: {}", errors),
+            }),
+        )
+            .into_response();
+    }
+
+    // Verify that the current user is a teacher
+    if claims.role != "TEACHER" {
+        return (
+            StatusCode::FORBIDDEN,
+            Json(ErrorResponse {
+                message: "Only teachers can register students".to_string(),
+            }),
+        )
+            .into_response();
+    }
+
+    // Check if the students list is empty
+    if payload.students.is_empty() {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(ErrorResponse {
+                message: "No students provided".to_string(),
+            }),
+        )
+            .into_response();
+    }
+
+    // Register students
+    match user_service::create_students(db.as_ref(), payload.students).await {
+        Ok(students) => {
+            // Convert to DTOs
+            let student_dtos: Vec<UserDTO> = students.into_iter().map(UserDTO::from).collect();
+            
+            // Return response
+            (
+                StatusCode::CREATED,
+                Json(RegisterStudentsResponse {
+                    created_count: student_dtos.len(),
+                    students: student_dtos,
+                }),
+            )
+                .into_response()
+        }
+        Err(e) => {
+            tracing::error!("Failed to create students: {:?}", e);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ErrorResponse {
+                    message: "Failed to register students".to_string(),
+                }),
+            )
+                .into_response()
+        }
+    }
 }
