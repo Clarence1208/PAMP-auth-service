@@ -40,6 +40,7 @@ pub struct CallbackParams {
         crate::handlers::user_handler::get_current_user,
         crate::handlers::user_handler::get_user_by_id,
         crate::handlers::user_handler::get_user_by_email,
+        crate::handlers::user_handler::get_all_users,
         crate::handlers::debug_handler::debug_token,
         crate::handlers::student_handler::register_students,
     ),

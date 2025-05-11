@@ -240,4 +240,41 @@ pub async fn get_user_by_email(
                 .into_response()
         }
     }
+}
+
+#[utoipa::path(
+    get,
+    path = "/users",
+    tag = "users",
+    security(
+        ("bearer_auth" = [])
+    ),
+    responses(
+        (status = 200, description = "List of all users", body = Vec<UserDTO>),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 500, description = "Internal server error", body = ErrorResponse)
+    )
+)]
+#[axum::debug_handler]
+pub async fn get_all_users(
+    Extension(db): Extension<Arc<DatabaseConnection>>,
+) -> Response {
+    // Find all users in database
+    match user_service::find_all(db.as_ref()).await {
+        Ok(users) => {
+            // Convert all users to DTOs
+            let user_dtos: Vec<UserDTO> = users.into_iter().map(UserDTO::from).collect();
+            Json(user_dtos).into_response()
+        },
+        Err(e) => {
+            tracing::error!("Database error: {:?}", e);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ErrorResponse {
+                    message: "Database error".to_string(),
+                }),
+            )
+                .into_response()
+        }
+    }
 } 

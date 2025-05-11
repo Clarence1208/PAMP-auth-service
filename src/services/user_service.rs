@@ -158,3 +158,7 @@ pub async fn create_students(
 
     Ok(created_students)
 }
+
+pub async fn find_all(db: &DatabaseConnection) -> Result<Vec<Model>, DbErr> {
+    User::find().all(db).await
+}
