@@ -1,10 +1,10 @@
+use crate::api_docs::ErrorResponse;
 use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
     Json,
 };
 use serde_json::json;
-use crate::api_docs::ErrorResponse;
 
 #[utoipa::path(
     post,
@@ -18,12 +18,10 @@ use crate::api_docs::ErrorResponse;
     )
 )]
 #[axum::debug_handler]
-pub async fn debug_token(
-    Json(token): Json<String>,
-) -> Response {
-    use std::env;
+pub async fn debug_token(Json(token): Json<String>) -> Response {
     use jsonwebtoken::{decode, DecodingKey, Validation};
     use serde_json::json;
+    use std::env;
 
     // Get JWT secret
     let jwt_secret = match env::var("JWT_SECRET") {
@@ -45,7 +43,7 @@ pub async fn debug_token(
     no_validation.validate_exp = false;
     no_validation.validate_nbf = false;
     no_validation.required_spec_claims.clear();
-    
+
     let decoded_without_validation = decode::<serde_json::Value>(
         &token,
         &DecodingKey::from_secret(jwt_secret.as_bytes()),
@@ -55,7 +53,7 @@ pub async fn debug_token(
     // Try to decode the token with validation
     let mut validation = Validation::default();
     validation.validate_exp = true;
-    
+
     let decoded_with_validation = decode::<crate::auth::jwt::Claims>(
         &token,
         &DecodingKey::from_secret(jwt_secret.as_bytes()),
@@ -97,4 +95,4 @@ pub async fn debug_token(
         })),
     )
         .into_response()
-} 
+}

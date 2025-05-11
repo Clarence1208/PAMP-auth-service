@@ -8,12 +8,7 @@ use sea_orm::DatabaseConnection;
 use std::sync::Arc;
 use uuid::Uuid;
 
-use crate::{
-    api_docs::ErrorResponse,
-    auth::jwt,
-    entities::user::UserDTO,
-    services::user_service,
-};
+use crate::{api_docs::ErrorResponse, auth::jwt, entities::user::UserDTO, services::user_service};
 
 #[utoipa::path(
     get,
@@ -109,7 +104,7 @@ pub async fn get_current_user(
             // Convert to DTO
             let user_dto = UserDTO::from(user);
             Json(user_dto).into_response()
-        },
+        }
         Ok(None) => (
             StatusCode::NOT_FOUND,
             Json(ErrorResponse {
@@ -172,7 +167,7 @@ pub async fn get_user_by_id(
             // Convert to DTO
             let user_dto = UserDTO::from(user);
             Json(user_dto).into_response()
-        },
+        }
         Ok(None) => (
             StatusCode::NOT_FOUND,
             Json(ErrorResponse {
@@ -221,7 +216,7 @@ pub async fn get_user_by_email(
             // Convert to DTO
             let user_dto = UserDTO::from(user);
             Json(user_dto).into_response()
-        },
+        }
         Ok(None) => (
             StatusCode::NOT_FOUND,
             Json(ErrorResponse {
@@ -256,16 +251,14 @@ pub async fn get_user_by_email(
     )
 )]
 #[axum::debug_handler]
-pub async fn get_all_users(
-    Extension(db): Extension<Arc<DatabaseConnection>>,
-) -> Response {
+pub async fn get_all_users(Extension(db): Extension<Arc<DatabaseConnection>>) -> Response {
     // Find all users in database
     match user_service::find_all(db.as_ref()).await {
         Ok(users) => {
             // Convert all users to DTOs
             let user_dtos: Vec<UserDTO> = users.into_iter().map(UserDTO::from).collect();
             Json(user_dtos).into_response()
-        },
+        }
         Err(e) => {
             tracing::error!("Database error: {:?}", e);
             (
@@ -277,4 +270,4 @@ pub async fn get_all_users(
                 .into_response()
         }
     }
-} 
+}

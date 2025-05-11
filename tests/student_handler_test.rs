@@ -20,11 +20,7 @@ use PAMP_auth_service::{
 const BODY_SIZE_LIMIT: usize = 16 * 1024 * 1024;
 
 // Mock auth middleware that injects claims
-async fn mock_auth_middleware(
-    claims: Claims,
-    mut req: Request,
-    next: Next,
-) -> Response {
+async fn mock_auth_middleware(claims: Claims, mut req: Request, next: Next) -> Response {
     req.extensions_mut().insert(claims);
     next.run(req).await
 }
@@ -46,11 +42,7 @@ async fn test_register_students_success() {
     .unwrap();
 
     // Create token for teacher
-    let token = common::create_test_token(
-        teacher.user_id,
-        &teacher.email,
-        &UserRole::Teacher,
-    );
+    let token = common::create_test_token(teacher.user_id, &teacher.email, &UserRole::Teacher);
 
     // Create claims for middleware
     let claims = Claims {
@@ -64,9 +56,7 @@ async fn test_register_students_success() {
     // Add middleware layer for auth
     let app = app.layer(from_fn(move |req, next| {
         let claims_clone = claims.clone();
-        async move {
-            mock_auth_middleware(claims_clone, req, next).await
-        }
+        async move { mock_auth_middleware(claims_clone, req, next).await }
     }));
 
     // Create request payload
@@ -100,9 +90,11 @@ async fn test_register_students_success() {
     assert_eq!(response.status(), StatusCode::CREATED);
 
     // Check response body
-    let body = to_bytes(response.into_body(), BODY_SIZE_LIMIT).await.unwrap();
+    let body = to_bytes(response.into_body(), BODY_SIZE_LIMIT)
+        .await
+        .unwrap();
     let response: RegisterStudentsResponse = serde_json::from_slice(&body).unwrap();
-    
+
     assert_eq!(response.created_count, 2);
     assert_eq!(response.students.len(), 2);
     assert_eq!(response.students[0].email, "student1@example.com");
@@ -126,11 +118,7 @@ async fn test_register_students_empty_list() {
     .unwrap();
 
     // Create token for teacher
-    let token = common::create_test_token(
-        teacher.user_id,
-        &teacher.email,
-        &UserRole::Teacher,
-    );
+    let token = common::create_test_token(teacher.user_id, &teacher.email, &UserRole::Teacher);
 
     // Create claims for middleware
     let claims = Claims {
@@ -144,9 +132,7 @@ async fn test_register_students_empty_list() {
     // Add middleware layer for auth
     let app = app.layer(from_fn(move |req, next| {
         let claims_clone = claims.clone();
-        async move {
-            mock_auth_middleware(claims_clone, req, next).await
-        }
+        async move { mock_auth_middleware(claims_clone, req, next).await }
     }));
 
     // Create request payload with empty students list
@@ -167,9 +153,14 @@ async fn test_register_students_empty_list() {
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);
 
     // Check error message
-    let body = to_bytes(response.into_body(), BODY_SIZE_LIMIT).await.unwrap();
+    let body = to_bytes(response.into_body(), BODY_SIZE_LIMIT)
+        .await
+        .unwrap();
     let error: ErrorResponse = serde_json::from_slice(&body).unwrap();
-    assert!(error.message.contains("Validation error") || error.message.contains("No students provided"));
+    assert!(
+        error.message.contains("Validation error")
+            || error.message.contains("No students provided")
+    );
 }
 
 #[tokio::test]
@@ -189,11 +180,7 @@ async fn test_register_students_not_a_teacher() {
     .unwrap();
 
     // Create token for student
-    let token = common::create_test_token(
-        student.user_id,
-        &student.email,
-        &UserRole::Student,
-    );
+    let token = common::create_test_token(student.user_id, &student.email, &UserRole::Student);
 
     // Create claims for middleware with student role
     let claims = Claims {
@@ -203,23 +190,19 @@ async fn test_register_students_not_a_teacher() {
         iat: chrono::Utc::now().timestamp(),
         exp: (chrono::Utc::now() + chrono::Duration::hours(1)).timestamp(),
     };
-    
+
     // Add middleware layer for auth with student role
     let app = app.layer(from_fn(move |req, next| {
         let claims_clone = claims.clone();
-        async move {
-            mock_auth_middleware(claims_clone, req, next).await
-        }
+        async move { mock_auth_middleware(claims_clone, req, next).await }
     }));
 
     // Create request payload
-    let students = vec![
-        RegisterStudentRequest {
-            email: "student1@example.com".to_string(),
-            first_name: "Student".to_string(),
-            last_name: "One".to_string(),
-        },
-    ];
+    let students = vec![RegisterStudentRequest {
+        email: "student1@example.com".to_string(),
+        first_name: "Student".to_string(),
+        last_name: "One".to_string(),
+    }];
 
     let payload = RegisterStudentsRequest { students };
 
@@ -238,7 +221,9 @@ async fn test_register_students_not_a_teacher() {
     assert_eq!(response.status(), StatusCode::FORBIDDEN);
 
     // Check error message
-    let body = to_bytes(response.into_body(), BODY_SIZE_LIMIT).await.unwrap();
+    let body = to_bytes(response.into_body(), BODY_SIZE_LIMIT)
+        .await
+        .unwrap();
     let error: ErrorResponse = serde_json::from_slice(&body).unwrap();
     assert_eq!(error.message, "Only teachers can register students");
-} 
+}

@@ -9,7 +9,7 @@ use utoipa_swagger_ui::SwaggerUi;
 use dotenvy::dotenv;
 use log::info;
 use std::net::SocketAddr;
-use std::sync::{Arc};
+use std::sync::Arc;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 mod api_docs;

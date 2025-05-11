@@ -72,7 +72,8 @@ pub async fn auth_middleware(request: Request, next: Next) -> Response {
                 Json(ErrorResponse {
                     message: format!("Token validation error: {:?}", e),
                 }),
-            ).into_response()
+            )
+                .into_response()
         }
     }
 }

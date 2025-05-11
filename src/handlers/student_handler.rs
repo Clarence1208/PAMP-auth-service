@@ -73,8 +73,11 @@ pub async fn register_students(
     match user_service::create_students(db.as_ref(), payload.students).await {
         Ok(students) => {
             // Convert to DTOs
-            let student_dtos: Vec<crate::entities::user::UserDTO> = students.into_iter().map(crate::entities::user::UserDTO::from).collect();
-            
+            let student_dtos: Vec<crate::entities::user::UserDTO> = students
+                .into_iter()
+                .map(crate::entities::user::UserDTO::from)
+                .collect();
+
             // Return response
             (
                 StatusCode::CREATED,
@@ -96,4 +99,4 @@ pub async fn register_students(
                 .into_response()
         }
     }
-} 
+}
