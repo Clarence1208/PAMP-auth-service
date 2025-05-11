@@ -87,6 +87,11 @@ fn createAPIRoutes() -> Router {
                 .route_layer(axum::middleware::from_fn(auth_middleware)),
         )
         .route(
+            "/users",
+            get(user_handler::get_all_users)
+                .route_layer(axum::middleware::from_fn(auth_middleware)),
+        )
+        .route(
             "/users/{id}",
             get(user_handler::get_user_by_id)
                 .route_layer(axum::middleware::from_fn(auth_middleware)),
