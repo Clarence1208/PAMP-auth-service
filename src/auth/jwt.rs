@@ -5,14 +5,13 @@ use serde::{Deserialize, Serialize};
 use std::env;
 use uuid::Uuid;
 
-#[derive(Debug, Serialize, Deserialize)]
-#[derive(Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Claims {
     // Standard JWT claims
-    pub sub: String,        // subject (user ID)
-    pub exp: i64,           // expiration time
-    pub iat: i64,           // issued at
-    
+    pub sub: String, // subject (user ID)
+    pub exp: i64,    // expiration time
+    pub iat: i64,    // issued at
+
     // Custom claims
     pub email: String,
     pub role: String,
@@ -43,7 +42,7 @@ pub fn create_token(user_id: Uuid, email: &str, role: &UserRole) -> Result<Strin
         sub: user_id.to_string(),
         iat: now.timestamp(),
         exp: expires_at.timestamp(),
-        
+
         // Custom claims
         email: email.to_string(),
         role: role_str.to_string(),

@@ -52,9 +52,10 @@ async fn test_find_by_id() {
         last_name: "ById".to_string(),
     };
 
-    let created_user = user_service::create_teacher(&db, request, Some("hashed_password".to_string()))
-        .await
-        .unwrap();
+    let created_user =
+        user_service::create_teacher(&db, request, Some("hashed_password".to_string()))
+            .await
+            .unwrap();
 
     // Find the user by ID
     let found_user = user_service::find_by_id(&db, created_user.user_id)
@@ -74,7 +75,9 @@ async fn test_find_by_id_not_found() {
 
     // Try to find a non-existent user
     let non_existent_id = Uuid::new_v4();
-    let result = user_service::find_by_id(&db, non_existent_id).await.unwrap();
+    let result = user_service::find_by_id(&db, non_existent_id)
+        .await
+        .unwrap();
 
     // Should return None
     assert!(result.is_none());
@@ -93,9 +96,10 @@ async fn test_find_by_email() {
         last_name: "ByEmail".to_string(),
     };
 
-    let created_user = user_service::create_teacher(&db, request, Some("hashed_password".to_string()))
-        .await
-        .unwrap();
+    let created_user =
+        user_service::create_teacher(&db, request, Some("hashed_password".to_string()))
+            .await
+            .unwrap();
 
     // Find the user by email
     let found_user = user_service::find_by_email(&db, &created_user.email)
@@ -142,13 +146,11 @@ async fn test_create_students() {
     ];
 
     // Create students
-    let created_students = user_service::create_students(&db, students)
-        .await
-        .unwrap();
+    let created_students = user_service::create_students(&db, students).await.unwrap();
 
     // Check that both students were created
     assert_eq!(created_students.len(), 2);
-    
+
     // Check properties of the first student
     let student1 = &created_students[0];
     assert_eq!(student1.email, "student1@example.com");
@@ -157,7 +159,7 @@ async fn test_create_students() {
     assert_eq!(student1.role, UserRole::Student.to_string());
     assert_eq!(student1.password_hash, None); // Students don't have passwords
     assert!(student1.is_active);
-    
+
     // Check properties of the second student
     let student2 = &created_students[1];
     assert_eq!(student2.email, "student2@example.com");
@@ -179,7 +181,7 @@ async fn test_create_students_skip_existing() {
         first_name: "Existing".to_string(),
         last_name: "Student".to_string(),
     };
-    
+
     let students_first_batch = vec![existing_student.clone()];
     user_service::create_students(&db, students_first_batch)
         .await
@@ -191,7 +193,7 @@ async fn test_create_students_skip_existing() {
         first_name: "New".to_string(),
         last_name: "Student".to_string(),
     };
-    
+
     let students_second_batch = vec![existing_student, new_student];
     let created_students = user_service::create_students(&db, students_second_batch)
         .await
@@ -200,4 +202,4 @@ async fn test_create_students_skip_existing() {
     // Should only create the new student
     assert_eq!(created_students.len(), 1);
     assert_eq!(created_students[0].email, "new@example.com");
-} 
+}

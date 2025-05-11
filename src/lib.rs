@@ -44,4 +44,4 @@ impl OAuthState {
             .expect("Failed to lock OAuth state mutex");
         states.get(&state).cloned()
     }
-} 
+}

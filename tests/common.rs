@@ -1,5 +1,5 @@
 use axum::{
-    body::{Body, to_bytes},
+    body::{to_bytes, Body},
     extract::Extension,
     http::{self, Request},
     routing::{get, post},
@@ -50,26 +50,14 @@ pub fn create_test_app(db: Arc<DatabaseConnection>) -> Router {
             "/register/students",
             post(handlers::student_handler::register_students),
         )
-        .route(
-            "/me",
-            get(handlers::user_handler::get_current_user),
-        )
-        .route(
-            "/users",
-            get(handlers::user_handler::get_all_users),
-        )
+        .route("/me", get(handlers::user_handler::get_current_user))
+        .route("/users", get(handlers::user_handler::get_all_users))
         .route(
             "/users/email/{email}",
             get(handlers::user_handler::get_user_by_email),
         )
-        .route(
-            "/users/{id}",
-            get(handlers::user_handler::get_user_by_id),
-        )
-        .route(
-            "/debug-token",
-            post(handlers::debug_handler::debug_token),
-        )
+        .route("/users/{id}", get(handlers::user_handler::get_user_by_id))
+        .route("/debug-token", post(handlers::debug_handler::debug_token))
         .layer(Extension(db))
 }
 
@@ -80,9 +68,9 @@ pub async fn create_test_user(
     password_hash: Option<String>,
     role: UserRole,
 ) -> Result<UserModel, DbErr> {
-    use sea_orm::{ActiveModelTrait, Set};
     use chrono::Utc;
-    
+    use sea_orm::{ActiveModelTrait, Set};
+
     let now = Utc::now();
     let user = PAMP_auth_service::entities::user::ActiveModel {
         user_id: Set(Uuid::new_v4()),
@@ -104,7 +92,8 @@ pub async fn create_test_user(
 /// Creates a JWT token for testing
 pub fn create_test_token(user_id: Uuid, email: &str, role: &UserRole) -> String {
     setup_jwt_secret();
-    PAMP_auth_service::auth::jwt::create_token(user_id, email, role).expect("Failed to create test token")
+    PAMP_auth_service::auth::jwt::create_token(user_id, email, role)
+        .expect("Failed to create test token")
 }
 
 /// Creates a test request with authorization header
@@ -143,4 +132,4 @@ where
 pub async fn parse_json<T: serde::de::DeserializeOwned>(body: Body) -> T {
     let bytes = to_bytes(body, BODY_SIZE_LIMIT).await.unwrap();
     serde_json::from_slice(&bytes).unwrap()
-} 
+}

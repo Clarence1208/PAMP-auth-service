@@ -1,5 +1,5 @@
 use argon2::{
-    password_hash::{rand_core::OsRng, SaltString, PasswordHash, PasswordVerifier},
+    password_hash::{rand_core::OsRng, PasswordHash, PasswordVerifier, SaltString},
     Argon2, PasswordHasher,
 };
 use axum::{
@@ -12,10 +12,10 @@ use std::sync::Arc;
 use validator::Validate;
 
 use crate::{
-    api_docs::{ErrorResponse, AuthResponse}, 
-    entities::user::{RegisterTeacherRequest, LoginRequest, UserRole}, 
-    services::user_service, 
+    api_docs::{AuthResponse, ErrorResponse},
     auth::jwt,
+    entities::user::{LoginRequest, RegisterTeacherRequest, UserRole},
+    services::user_service,
 };
 
 #[utoipa::path(
@@ -200,7 +200,10 @@ pub async fn login_teacher(
 
     // Verify the password
     let argon2 = Argon2::default();
-    if argon2.verify_password(payload.password.as_bytes(), &parsed_hash).is_err() {
+    if argon2
+        .verify_password(payload.password.as_bytes(), &parsed_hash)
+        .is_err()
+    {
         return (
             StatusCode::UNAUTHORIZED,
             Json(ErrorResponse {
@@ -225,9 +228,5 @@ pub async fn login_teacher(
         }
     };
 
-    (
-        StatusCode::OK,
-        Json(AuthResponse { token }),
-    )
-        .into_response()
-} 
+    (StatusCode::OK, Json(AuthResponse { token })).into_response()
+}

@@ -32,11 +32,7 @@ async fn test_get_current_user_success() {
     .unwrap();
 
     // Create token for user
-    let token = common::create_test_token(
-        user.user_id,
-        &user.email,
-        &UserRole::Teacher,
-    );
+    let token = common::create_test_token(user.user_id, &user.email, &UserRole::Teacher);
 
     // Send request
     let response = app
@@ -53,9 +49,11 @@ async fn test_get_current_user_success() {
     assert_eq!(response.status(), StatusCode::OK);
 
     // Check response body
-    let body = to_bytes(response.into_body(), BODY_SIZE_LIMIT).await.unwrap();
+    let body = to_bytes(response.into_body(), BODY_SIZE_LIMIT)
+        .await
+        .unwrap();
     let user_dto: UserDTO = serde_json::from_slice(&body).unwrap();
-    
+
     assert_eq!(user_dto.user_id, user.user_id);
     assert_eq!(user_dto.email, user.email);
     assert_eq!(user_dto.first_name, user.first_name);
@@ -80,7 +78,9 @@ async fn test_get_current_user_no_auth_header() {
     assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
 
     // Check error message
-    let body = to_bytes(response.into_body(), BODY_SIZE_LIMIT).await.unwrap();
+    let body = to_bytes(response.into_body(), BODY_SIZE_LIMIT)
+        .await
+        .unwrap();
     let error: ErrorResponse = serde_json::from_slice(&body).unwrap();
     assert_eq!(error.message, "Missing Authorization header");
 }
@@ -105,7 +105,9 @@ async fn test_get_current_user_invalid_token() {
     assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
 
     // Check error message
-    let body = to_bytes(response.into_body(), BODY_SIZE_LIMIT).await.unwrap();
+    let body = to_bytes(response.into_body(), BODY_SIZE_LIMIT)
+        .await
+        .unwrap();
     let error: ErrorResponse = serde_json::from_slice(&body).unwrap();
     assert_eq!(error.message, "Invalid or expired token");
 }
@@ -139,7 +141,9 @@ async fn test_get_current_user_not_found() {
     assert_eq!(response.status(), StatusCode::NOT_FOUND);
 
     // Check error message
-    let body = to_bytes(response.into_body(), BODY_SIZE_LIMIT).await.unwrap();
+    let body = to_bytes(response.into_body(), BODY_SIZE_LIMIT)
+        .await
+        .unwrap();
     let error: ErrorResponse = serde_json::from_slice(&body).unwrap();
     assert_eq!(error.message, "User not found");
-} 
+}
