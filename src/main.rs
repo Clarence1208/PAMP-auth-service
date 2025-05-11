@@ -24,8 +24,11 @@ mod services;
 use api_docs::ApiDoc;
 use auth::middleware::auth_middleware;
 use db::{ensure_schema_exists, init_db};
-use handlers::auth_handler;
-use handlers::google_handler as auth_google;
+use handlers::debug_handler;
+use handlers::google_handler;
+use handlers::student_handler;
+use handlers::teacher_handler;
+use handlers::user_handler;
 use providers::google_provider::init_google_client;
 
 // fixme Simple in-memory storage for OAuth state and verifiers
@@ -81,25 +84,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let api_routes = Router::new()
         .route(
-            "/auth/register/teacher",
-            post(auth_handler::register_teacher),
+            "/register/teacher",
+            post(teacher_handler::register_teacher),
         )
-        .route("/auth/login/teacher", post(auth_handler::login_teacher))
-        .route("/auth/debug-token", post(auth_handler::debug_token))
+        .route("/login/teacher", post(teacher_handler::login_teacher))
+        .route("/debug-token", post(debug_handler::debug_token))
         .route(
-            "/auth/register/students",
-            post(auth_handler::register_students)
-                .route_layer(axum::middleware::from_fn(auth_middleware)),
+            "/register/students", 
+            post(student_handler::register_students)
+                .route_layer(axum::middleware::from_fn(auth_middleware))
         )
-        .route(
-            "/me",
-            get(auth_handler::get_current_user)
-                .route_layer(axum::middleware::from_fn(auth_middleware)),
-        );
+        .route("/me", get(user_handler::get_current_user)
+            .route_layer(axum::middleware::from_fn(auth_middleware)));
 
     let auth_routes = Router::new()
-        .route("/auth/google", get(auth_google::google_login))
-        .route("/auth/callback/google", get(auth_google::google_callback));
+        .route("/login/google", get(google_handler::google_login))
+        .route("/login/callback/google", get(google_handler::google_callback));
 
     let openapi = ApiDoc::openapi();
 

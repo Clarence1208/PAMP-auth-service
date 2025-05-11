@@ -19,7 +19,7 @@ use std::sync::Arc;
 
 #[utoipa::path(
     get,
-    path = "/auth/google",
+    path = "/login/google",
     tag = "authentication",
     responses(
         (status = 302, description = "Redirect to Google OAuth login page"),
@@ -69,7 +69,7 @@ pub async fn google_login(
 
 #[utoipa::path(
     get,
-    path = "/auth/callback/google",
+    path = "/login/callback/google",
     tag = "authentication",
     params(
         ("code" = String, Query, description = "OAuth authorization code"),

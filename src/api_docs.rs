@@ -35,11 +35,11 @@ pub struct CallbackParams {
     paths(
         crate::handlers::google_handler::google_login,
         crate::handlers::google_handler::google_callback,
-        crate::handlers::auth_handler::register_teacher,
-        crate::handlers::auth_handler::get_current_user,
-        crate::handlers::auth_handler::login_teacher,
-        crate::handlers::auth_handler::debug_token,
-        crate::handlers::auth_handler::register_students,
+        crate::handlers::teacher_handler::register_teacher,
+        crate::handlers::teacher_handler::login_teacher,
+        crate::handlers::user_handler::get_current_user,
+        crate::handlers::debug_handler::debug_token,
+        crate::handlers::student_handler::register_students,
     ),
     components(
         schemas(
