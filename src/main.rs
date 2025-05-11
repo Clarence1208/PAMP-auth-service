@@ -2,7 +2,6 @@ use axum::{
     routing::{get, post},
     Extension, Router,
 };
-use std::collections::HashMap;
 use tower_http::cors::{Any, CorsLayer};
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
@@ -10,7 +9,7 @@ use utoipa_swagger_ui::SwaggerUi;
 use dotenvy::dotenv;
 use log::info;
 use std::net::SocketAddr;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 mod api_docs;
@@ -85,6 +84,16 @@ fn createAPIRoutes() -> Router {
         .route(
             "/me",
             get(user_handler::get_current_user)
+                .route_layer(axum::middleware::from_fn(auth_middleware)),
+        )
+        .route(
+            "/users/{id}",
+            get(user_handler::get_user_by_id)
+                .route_layer(axum::middleware::from_fn(auth_middleware)),
+        )
+        .route(
+            "/users/email/{email}",
+            get(user_handler::get_user_by_email)
                 .route_layer(axum::middleware::from_fn(auth_middleware)),
         )
 }
