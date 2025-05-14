@@ -109,7 +109,7 @@ pub async fn register_teacher(
     tag = "authentication",
     request_body = LoginRequest,
     responses(
-        (status = 200, description = "Login successful", body = AuthResponse),
+        (status = 200, description = "Login successful, returns JWT token", body = AuthResponse),
         (status = 400, description = "Invalid input", body = ErrorResponse),
         (status = 401, description = "Invalid credentials", body = ErrorResponse),
         (status = 403, description = "User is not a teacher", body = ErrorResponse),
