@@ -1,7 +1,7 @@
 use chrono::Utc;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, DatabaseConnection, DatabaseTransaction, DbErr, EntityTrait,
-    QueryFilter, Set, TransactionTrait,
+    QueryFilter, Set, TransactionTrait, Condition,
 };
 use uuid::Uuid;
 
@@ -161,4 +161,21 @@ pub async fn create_students(
 
 pub async fn find_all(db: &DatabaseConnection) -> Result<Vec<Model>, DbErr> {
     User::find().all(db).await
+}
+
+pub async fn find_by_ids(db: &DatabaseConnection, ids: Vec<Uuid>) -> Result<Vec<Model>, DbErr> {
+    if ids.is_empty() {
+        return Ok(vec![]);
+    }
+    
+    // Create a condition for multiple IDs
+    let mut condition = Condition::any();
+    for id in ids {
+        condition = condition.add(Column::UserId.eq(id));
+    }
+    
+    User::find()
+        .filter(condition)
+        .all(db)
+        .await
 }

@@ -1,10 +1,11 @@
 use axum::{
-    extract::{Extension, Path},
+    extract::{Extension, Path, Query},
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
     Json,
 };
 use sea_orm::DatabaseConnection;
+use serde::Deserialize;
 use std::sync::Arc;
 use uuid::Uuid;
 
@@ -237,37 +238,98 @@ pub async fn get_user_by_email(
     }
 }
 
+#[derive(Debug, Deserialize)]
+pub struct UserIdsQuery {
+    ids: Option<String>,
+}
+
 #[utoipa::path(
     get,
     path = "/users",
     tag = "users",
+    params(
+        ("ids" = Option<String>, Query, description = "Optional comma-separated list of user IDs (UUIDs)")
+    ),
     security(
         ("bearer_auth" = [])
     ),
     responses(
-        (status = 200, description = "List of all users", body = Vec<UserDTO>),
+        (status = 200, description = "List of users", body = Vec<UserDTO>),
+        (status = 400, description = "Invalid user ID format", body = ErrorResponse),
         (status = 401, description = "Unauthorized", body = ErrorResponse),
         (status = 500, description = "Internal server error", body = ErrorResponse)
     )
 )]
 #[axum::debug_handler]
-pub async fn get_all_users(Extension(db): Extension<Arc<DatabaseConnection>>) -> Response {
-    // Find all users in database
-    match user_service::find_all(db.as_ref()).await {
-        Ok(users) => {
-            // Convert all users to DTOs
-            let user_dtos: Vec<UserDTO> = users.into_iter().map(UserDTO::from).collect();
-            Json(user_dtos).into_response()
+pub async fn get_all_users(
+    Extension(db): Extension<Arc<DatabaseConnection>>,
+    Query(params): Query<UserIdsQuery>,
+) -> Response {
+    // Check if IDs were provided in the query
+    if let Some(ids_str) = params.ids {
+        // Handle both URL-encoded commas %2C and regular commas
+        let normalized_ids = ids_str.replace("%2C", ",");
+        
+        // Parse the comma-separated IDs
+        let id_strings: Vec<&str> = normalized_ids
+            .split(',')
+            .map(|s| s.trim_matches('"'))
+            .collect();
+        
+        let mut user_ids = Vec::with_capacity(id_strings.len());
+        
+        // Parse each ID
+        for id_str in id_strings {
+            match Uuid::parse_str(id_str) {
+                Ok(id) => user_ids.push(id),
+                Err(_) => {
+                    return (
+                        StatusCode::BAD_REQUEST,
+                        Json(ErrorResponse {
+                            message: format!("Invalid user ID format: {}", id_str),
+                        }),
+                    )
+                        .into_response();
+                }
+            }
         }
-        Err(e) => {
-            tracing::error!("Database error: {:?}", e);
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ErrorResponse {
-                    message: "Database error".to_string(),
-                }),
-            )
-                .into_response()
+        
+        // Find users by IDs
+        match user_service::find_by_ids(db.as_ref(), user_ids).await {
+            Ok(users) => {
+                // Convert users to DTOs
+                let user_dtos: Vec<UserDTO> = users.into_iter().map(UserDTO::from).collect();
+                Json(user_dtos).into_response()
+            }
+            Err(e) => {
+                tracing::error!("Database error: {:?}", e);
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(ErrorResponse {
+                        message: "Database error".to_string(),
+                    }),
+                )
+                    .into_response()
+            }
+        }
+    } else {
+        // No IDs provided, return all users
+        match user_service::find_all(db.as_ref()).await {
+            Ok(users) => {
+                // Convert all users to DTOs
+                let user_dtos: Vec<UserDTO> = users.into_iter().map(UserDTO::from).collect();
+                Json(user_dtos).into_response()
+            }
+            Err(e) => {
+                tracing::error!("Database error: {:?}", e);
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(ErrorResponse {
+                        message: "Database error".to_string(),
+                    }),
+                )
+                    .into_response()
+            }
         }
     }
 }
