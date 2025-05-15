@@ -15,7 +15,7 @@ use crate::{
     api_docs::{AuthResponse, ErrorResponse},
     auth::jwt,
     entities::user::{LoginRequest, RegisterTeacherRequest, UserRole},
-    services::user_service,
+    services::{user_service, notification_service},
 };
 
 #[utoipa::path(
@@ -87,9 +87,28 @@ pub async fn register_teacher(
         }
     };
 
+    // Store teacher data for notification
+    let teacher_email = payload.email.clone();
+    let teacher_first_name = payload.first_name.clone();
+
     // Create new teacher user
     match user_service::create_teacher(db.as_ref(), payload, Some(password_hash)).await {
-        Ok(_) => StatusCode::CREATED.into_response(),
+        Ok(teacher) => {
+            // Send welcome notification to the teacher
+            // Fire and forget - don't wait for the notification to be sent
+            tokio::spawn(async move {
+                if let Err(e) = notification_service::send_teacher_registration_notification(
+                    &teacher_email,
+                    &teacher_first_name,
+                ).await {
+                    tracing::error!("Failed to send notification to teacher {}: {:?}", teacher_email, e);
+                } else {
+                    tracing::info!("Successfully sent welcome notification to teacher {}", teacher_email);
+                }
+            });
+
+            StatusCode::CREATED.into_response()
+        },
         Err(e) => {
             tracing::error!("Failed to create user: {:?}", e);
             (
