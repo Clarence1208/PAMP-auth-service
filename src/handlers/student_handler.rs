@@ -11,7 +11,7 @@ use crate::{
     api_docs::{ErrorResponse, RegisterStudentsResponse},
     auth::jwt::Claims,
     entities::user::RegisterStudentsRequest,
-    services::{user_service, notification_service},
+    services::{notification_service, user_service},
 };
 
 #[utoipa::path(
@@ -83,7 +83,7 @@ pub async fn register_students(
                 .into_response();
         }
     };
-    
+
     let teacher = match user_service::find_by_id(db.as_ref(), teacher_id).await {
         Ok(Some(teacher)) => teacher,
         Ok(None) => {
@@ -116,7 +116,7 @@ pub async fn register_students(
                 // If it fails, it will be logged but won't block the response
                 let teacher_clone = teacher.clone();
                 let student_clone = student.clone();
-                
+
                 tokio::spawn(async move {
                     if let Err(e) = notification_service::send_student_registration_notification(
                         &student_clone.email,
@@ -124,10 +124,19 @@ pub async fn register_students(
                         &teacher_clone.first_name,
                         &teacher_clone.last_name,
                         &teacher_clone.email,
-                    ).await {
-                        tracing::error!("Failed to send notification to student {}: {:?}", student_clone.email, e);
+                    )
+                    .await
+                    {
+                        tracing::error!(
+                            "Failed to send notification to student {}: {:?}",
+                            student_clone.email,
+                            e
+                        );
                     } else {
-                        tracing::info!("Successfully sent notification to student {}", student_clone.email);
+                        tracing::info!(
+                            "Successfully sent notification to student {}",
+                            student_clone.email
+                        );
                     }
                 });
             }

@@ -15,7 +15,7 @@ use crate::{
     api_docs::{AuthResponse, ErrorResponse},
     auth::jwt,
     entities::user::{LoginRequest, RegisterTeacherRequest, UserRole},
-    services::{user_service, notification_service},
+    services::{notification_service, user_service},
 };
 
 #[utoipa::path(
@@ -100,15 +100,24 @@ pub async fn register_teacher(
                 if let Err(e) = notification_service::send_teacher_registration_notification(
                     &teacher_email,
                     &teacher_first_name,
-                ).await {
-                    tracing::error!("Failed to send notification to teacher {}: {:?}", teacher_email, e);
+                )
+                .await
+                {
+                    tracing::error!(
+                        "Failed to send notification to teacher {}: {:?}",
+                        teacher_email,
+                        e
+                    );
                 } else {
-                    tracing::info!("Successfully sent welcome notification to teacher {}", teacher_email);
+                    tracing::info!(
+                        "Successfully sent welcome notification to teacher {}",
+                        teacher_email
+                    );
                 }
             });
 
             StatusCode::CREATED.into_response()
-        },
+        }
         Err(e) => {
             tracing::error!("Failed to create user: {:?}", e);
             (

@@ -1,7 +1,7 @@
 use chrono::Utc;
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, DatabaseConnection, DatabaseTransaction, DbErr, EntityTrait,
-    QueryFilter, Set, TransactionTrait, Condition,
+    ActiveModelTrait, ColumnTrait, Condition, DatabaseConnection, DatabaseTransaction, DbErr,
+    EntityTrait, QueryFilter, Set, TransactionTrait,
 };
 use uuid::Uuid;
 
@@ -167,15 +167,12 @@ pub async fn find_by_ids(db: &DatabaseConnection, ids: Vec<Uuid>) -> Result<Vec<
     if ids.is_empty() {
         return Ok(vec![]);
     }
-    
+
     // Create a condition for multiple IDs
     let mut condition = Condition::any();
     for id in ids {
         condition = condition.add(Column::UserId.eq(id));
     }
-    
-    User::find()
-        .filter(condition)
-        .all(db)
-        .await
+
+    User::find().filter(condition).all(db).await
 }
