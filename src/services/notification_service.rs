@@ -46,11 +46,13 @@ pub async fn send_student_registration_notification(
     let login_url = format!("{}/login", front_url);
     
     let message = format!(
-        "Hello {},\n\nYou have been registered to PAMP by {} {}. \
-        You can now access the PAMP platform to enhance your learning experience.\n\n\
+        "Hello {},\n\n\
+        We are excited to have you on board. You have been registered to PAMP by {} {}.\n\n \
+        You can now access the PAMP platform to enhance your learning experience. Access to PAMP through the button down here !\n\n\
         If you believe this registration was made in error, please contact your teacher \
         at {}.\n\n\
-        Thank you,\nThe PAMP Team",
+        Thank you,\nThe PAMP Team\
+       https://edulor.fr",
         student_first_name, teacher_first_name, teacher_last_name, teacher_email
     );
     
