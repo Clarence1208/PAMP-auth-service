@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
-use utoipa::{OpenApi, ToSchema, Modify};
-use utoipa::openapi::security::{SecurityScheme, HttpAuthScheme, HttpBuilder};
+use utoipa::openapi::security::{HttpAuthScheme, HttpBuilder, SecurityScheme};
+use utoipa::{Modify, OpenApi, ToSchema};
 
 /// Authentication response after successful login
 #[derive(Serialize, Deserialize, ToSchema)]

@@ -269,15 +269,15 @@ pub async fn get_all_users(
     if let Some(ids_str) = params.ids {
         // Handle both URL-encoded commas %2C and regular commas
         let normalized_ids = ids_str.replace("%2C", ",");
-        
+
         // Parse the comma-separated IDs
         let id_strings: Vec<&str> = normalized_ids
             .split(',')
             .map(|s| s.trim_matches('"'))
             .collect();
-        
+
         let mut user_ids = Vec::with_capacity(id_strings.len());
-        
+
         // Parse each ID
         for id_str in id_strings {
             match Uuid::parse_str(id_str) {
@@ -293,7 +293,7 @@ pub async fn get_all_users(
                 }
             }
         }
-        
+
         // Find users by IDs
         match user_service::find_by_ids(db.as_ref(), user_ids).await {
             Ok(users) => {
