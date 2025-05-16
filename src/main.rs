@@ -1,15 +1,19 @@
 use axum::{
+    http,
     routing::{get, post},
     Extension, Router,
 };
-use tower_http::cors::{Any, CorsLayer};
+use std::env;
+use tower_http::cors::CorsLayer;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
 use dotenvy::dotenv;
 use log::info;
+use reqwest::{header, Method};
 use std::net::SocketAddr;
 use std::sync::Arc;
+use std::time::Duration;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 mod api_docs;
@@ -50,7 +54,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let google_client = Arc::new(init_google_client());
     let oauth_state = OAuthState::new();
 
-    let cors_layer = CorsLayer::new().allow_origin(Any); //fixme: when we have the prod url
+    let cors_layer = CorsLayer::new()
+        .allow_origin(
+            env::var("FRONTEND_URL")
+                .unwrap_or_else(|_| "http://localhost:5173".to_string())
+                .parse::<http::HeaderValue>()
+                .unwrap_or_else(|_| {
+                    log::warn!("Failed to parse origin, falling back to Any");
+                    http::HeaderValue::from_static("*")
+                }),
+        )
+        .allow_methods([
+            Method::GET,
+            Method::POST,
+            Method::PUT,
+            Method::DELETE,
+            Method::PATCH,
+        ])
+        .allow_headers([header::AUTHORIZATION, header::CONTENT_TYPE])
+        .max_age(Duration::from_secs(86400));
 
     let app = Router::new()
         .route("/", get(|| async { "Hello from Auth Service!" }))
