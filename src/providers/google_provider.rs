@@ -13,7 +13,7 @@ pub fn init_google_client() -> CustomProvider {
 
     let redirect_uri = env::var("GOOGLE_REDIRECT_URI")
         .map_err(|_| eprintln!("Missing GOOGLE_REDIRECT_URI"))
-        .unwrap_or_else(|_| "http://localhost:3000/auth/callback/google".to_string());
+        .unwrap_or_else(|_| "http://localhost:3000/login/callback/google".to_string());
 
     GoogleProvider::new(client_id, client_secret, redirect_uri)
 }
