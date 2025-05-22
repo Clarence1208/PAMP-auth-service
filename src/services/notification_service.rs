@@ -34,11 +34,7 @@ pub async fn send_teacher_registration_notification(
 ) -> Result<(), NotificationError> {
     // Get the front URL from environment variables
     let frontend_url = env::var("FRONTEND_URL")
-        .map_err(|_| NotificationError::EnvError("FRONTEND_URL not set".to_string()))?;
-
-    // Get API key from environment variables or use default for local development
-    let api_key = env::var("NOTIFICATION_API_KEY")
-        .unwrap_or_else(|_| "9HnDynqinT6mPcyiD766FanAnVS4RmPz1ggVxJZm".to_string());
+        .map_err(|_| NotificationError::EnvError("FRONTEND_URL".to_string()))?;
 
     let student_batch_url = format!("{}/students/batch", frontend_url);
 
@@ -61,7 +57,7 @@ pub async fn send_teacher_registration_notification(
         buttonText: Some("Create your first Student Batch".to_string()),
     };
 
-    send_email_notification(&notification, &api_key).await
+    send_email_notification(&notification).await
 }
 
 /// Sends an email notification to a student after they've been registered by a teacher
@@ -75,10 +71,6 @@ pub async fn send_student_registration_notification(
     // Get the front URL from environment variables
     let front_url = env::var("FRONTEND_URL")
         .map_err(|_| NotificationError::EnvError("FRONTEND_URL not set".to_string()))?;
-
-    // Get API key from environment variables or use default for local development
-    let api_key = env::var("NOTIFICATION_API_KEY")
-        .unwrap_or_else(|_| "9HnDynqinT6mPcyiD766FanAnVS4RmPz1ggVxJZm".to_string());
 
     let login_url = format!("{}/login", front_url);
 
@@ -101,18 +93,21 @@ pub async fn send_student_registration_notification(
         buttonText: Some("Connect to PAMP".to_string()),
     };
 
-    send_email_notification(&notification, &api_key).await
+    send_email_notification(&notification).await
 }
 
 /// Sends an email notification using the notification API
 async fn send_email_notification(
     notification: &EmailNotification,
-    api_key: &str,
 ) -> Result<(), NotificationError> {
     let client = Client::new();
 
     // Prepare notification data with the button URL included in the message
     let notification_data = serde_json::to_value(notification)?;
+
+    // Get API key from environment variables or use default for local development
+    let api_key = env::var("NOTIFICATION_API_KEY")
+        .map_err(|_| NotificationError::EnvError("NOTIFICATION_API_KEY".to_string()))?;
 
     let response = client
         .post("https://b7ywphvnv6.execute-api.eu-west-1.amazonaws.com/prod/notify/email")
