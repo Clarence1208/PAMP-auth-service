@@ -11,6 +11,27 @@ This is the authentication service for the PAMP application. It provides endpoin
 - User profile retrieval
 - Token debugging
 
+## Database Schema
+
+The authentication service uses a simple database schema with a single entity. Below is the Entity Relationship Diagram (ERD) in Mermaid format:
+
+```mermaid
+erDiagram
+    USERS {
+        uuid user_id PK "Primary Key, UUID"
+        string email UK "Unique, Email address"
+        string password_hash "Optional, Hashed password"
+        string first_name "User's first name"
+        string last_name "User's last name"
+        string role "TEACHER or STUDENT"
+        string external_auth_provider "Optional, OAuth provider"
+        string external_auth_id "Optional, External auth ID"
+        boolean is_active "Default: true, Account status"
+        datetime created_at "Account creation timestamp"
+        datetime updated_at "Last update timestamp"
+    }
+```
+
 ## API Endpoints
 
 ### Authentication
