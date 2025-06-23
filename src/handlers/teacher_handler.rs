@@ -183,7 +183,7 @@ pub async fn login_teacher(
                 .into_response();
         }
     };
-    
+
     /// For testing purposes if the user is a student any password will be accepted
     /// fixme
     let role_student = UserRole::from(user.role.clone());
