@@ -183,6 +183,26 @@ pub async fn login_teacher(
                 .into_response();
         }
     };
+    
+    /// For testing purposes if the user is a student any password will be accepted
+    /// fixme
+    let role_student = UserRole::from(user.role.clone());
+    if role_student == UserRole::Student {
+        let token = match jwt::create_token(user.user_id, &user.email, &role_student) {
+            Ok(token) => token,
+            Err(e) => {
+                tracing::error!("Failed to generate JWT token: {:?}", e);
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(ErrorResponse {
+                        message: "Failed to generate authentication token".to_string(),
+                    }),
+                )
+                    .into_response();
+            }
+        };
+        return (StatusCode::OK, Json(AuthResponse { token })).into_response();
+    }
 
     // Check if user is a teacher
     let role = UserRole::from(user.role.clone());
