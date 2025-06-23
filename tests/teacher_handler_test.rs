@@ -230,53 +230,54 @@ async fn test_login_teacher_invalid_credentials() {
     assert_eq!(error.message, "Invalid email or password");
 }
 
-#[tokio::test]
-async fn test_login_teacher_not_a_teacher() {
-    // Setup
-    let db = Arc::new(common::setup_test_db().await.unwrap());
-    let app = common::create_test_app(db.clone());
-
-    // Create a test user with student role
-    let email = "student@example.com";
-    let password = "password123";
-
-    // Hash password
-    let salt =
-        argon2::password_hash::SaltString::generate(&mut argon2::password_hash::rand_core::OsRng);
-    let argon2 = argon2::Argon2::default();
-    let password_hash = argon2
-        .hash_password(password.as_bytes(), &salt)
-        .unwrap()
-        .to_string();
-
-    // Create user with student role
-    common::create_test_user(db.as_ref(), email, Some(password_hash), UserRole::Student)
-        .await
-        .unwrap();
-
-    // Create login payload
-    let payload = LoginRequest {
-        email: email.to_string(),
-        password: password.to_string(),
-    };
-
-    // Send request
-    let response = app
-        .oneshot(common::create_request(
-            Method::POST,
-            "/login/teacher",
-            serde_json::to_string(&payload).unwrap(),
-        ))
-        .await
-        .unwrap();
-
-    // Assert response
-    assert_eq!(response.status(), StatusCode::FORBIDDEN);
-
-    // Check error message
-    let body = to_bytes(response.into_body(), BODY_SIZE_LIMIT)
-        .await
-        .unwrap();
-    let error: ErrorResponse = serde_json::from_slice(&body).unwrap();
-    assert_eq!(error.message, "User is not a teacher");
-}
+//fixme uncomment when login as student is removed (prod situation)
+// #[tokio::test]
+// async fn test_login_teacher_not_a_teacher() {
+//     // Setup
+//     let db = Arc::new(common::setup_test_db().await.unwrap());
+//     let app = common::create_test_app(db.clone());
+// 
+//     // Create a test user with student role
+//     let email = "student@example.com";
+//     let password = "password123";
+// 
+//     // Hash password
+//     let salt =
+//         argon2::password_hash::SaltString::generate(&mut argon2::password_hash::rand_core::OsRng);
+//     let argon2 = argon2::Argon2::default();
+//     let password_hash = argon2
+//         .hash_password(password.as_bytes(), &salt)
+//         .unwrap()
+//         .to_string();
+// 
+//     // Create user with student role
+//     common::create_test_user(db.as_ref(), email, Some(password_hash), UserRole::Student)
+//         .await
+//         .unwrap();
+// 
+//     // Create login payload
+//     let payload = LoginRequest {
+//         email: email.to_string(),
+//         password: password.to_string(),
+//     };
+// 
+//     // Send request
+//     let response = app
+//         .oneshot(common::create_request(
+//             Method::POST,
+//             "/login/teacher",
+//             serde_json::to_string(&payload).unwrap(),
+//         ))
+//         .await
+//         .unwrap();
+// 
+//     // Assert response
+//     assert_eq!(response.status(), StatusCode::FORBIDDEN);
+// 
+//     // Check error message
+//     let body = to_bytes(response.into_body(), BODY_SIZE_LIMIT)
+//         .await
+//         .unwrap();
+//     let error: ErrorResponse = serde_json::from_slice(&body).unwrap();
+//     assert_eq!(error.message, "User is not a teacher");
+// }
